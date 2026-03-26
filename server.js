@@ -3,15 +3,8 @@ const app = express();
 
 app.use(express.json());
 
-// ⚠️ NE PAS CHANGER
 const PORT = process.env.PORT || 3000;
-
-// ⚠️ Mets une vraie valeur sur Render
 const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || "change-me";
-
-/*
-  ROUTAGE METIER
-*/
 
 const CONTACTS = {
   baptiste: {
@@ -53,7 +46,6 @@ const CONTACTS = {
 };
 
 const ROUTING = {
-  // Nord / IDF
   "02": CONTACTS.baptiste, "08": CONTACTS.baptiste, "27": CONTACTS.baptiste,
   "51": CONTACTS.baptiste, "59": CONTACTS.baptiste, "60": CONTACTS.baptiste,
   "62": CONTACTS.baptiste, "75": CONTACTS.baptiste, "76": CONTACTS.baptiste,
@@ -61,7 +53,6 @@ const ROUTING = {
   "91": CONTACTS.baptiste, "92": CONTACTS.baptiste, "93": CONTACTS.baptiste,
   "94": CONTACTS.baptiste, "95": CONTACTS.baptiste,
 
-  // Ouest
   "03": CONTACTS.guillaume, "14": CONTACTS.guillaume, "18": CONTACTS.guillaume,
   "22": CONTACTS.guillaume, "28": CONTACTS.guillaume, "29": CONTACTS.guillaume,
   "35": CONTACTS.guillaume, "36": CONTACTS.guillaume, "37": CONTACTS.guillaume,
@@ -70,7 +61,6 @@ const ROUTING = {
   "56": CONTACTS.guillaume, "58": CONTACTS.guillaume, "61": CONTACTS.guillaume,
   "72": CONTACTS.guillaume, "85": CONTACTS.guillaume, "89": CONTACTS.guillaume,
 
-  // Sud-Ouest
   "09": CONTACTS.laurent, "16": CONTACTS.laurent, "17": CONTACTS.laurent,
   "19": CONTACTS.laurent, "23": CONTACTS.laurent, "24": CONTACTS.laurent,
   "31": CONTACTS.laurent, "32": CONTACTS.laurent, "33": CONTACTS.laurent,
@@ -79,14 +69,12 @@ const ROUTING = {
   "81": CONTACTS.laurent, "82": CONTACTS.laurent, "86": CONTACTS.laurent,
   "87": CONTACTS.laurent,
 
-  // Est
   "01": CONTACTS.antony, "10": CONTACTS.antony, "21": CONTACTS.antony,
   "25": CONTACTS.antony, "39": CONTACTS.antony, "52": CONTACTS.antony,
   "54": CONTACTS.antony, "55": CONTACTS.antony, "57": CONTACTS.antony,
   "67": CONTACTS.antony, "68": CONTACTS.antony, "70": CONTACTS.antony,
   "71": CONTACTS.antony, "88": CONTACTS.antony, "90": CONTACTS.antony,
 
-  // Sud-Est
   "04": CONTACTS.benjamin, "05": CONTACTS.benjamin, "06": CONTACTS.benjamin,
   "07": CONTACTS.benjamin, "11": CONTACTS.benjamin, "12": CONTACTS.benjamin,
   "13": CONTACTS.benjamin, "15": CONTACTS.benjamin, "20": CONTACTS.benjamin,
@@ -97,7 +85,6 @@ const ROUTING = {
   "83": CONTACTS.benjamin, "84": CONTACTS.benjamin,
 };
 
-// 🔐 sécurité API
 function checkAuth(req, res, next) {
   const header = req.headers.authorization || "";
   if (!header.startsWith("Bearer ")) {
@@ -110,51 +97,113 @@ function checkAuth(req, res, next) {
   next();
 }
 
-// 🔧 normalisation
 function normalizeCode(input) {
-  if (!input) return null;
-  let code = String(input).replace("#", "").toUpperCase();
+  if (input == null) return null;
+
+  let code = String(input).trim().toUpperCase();
+
+  // retire un éventuel #
+  code = code.replace(/#/g, "");
 
   if (code === "2A" || code === "2B" || code === "20") return "20";
 
+  // garde uniquement les chiffres
   code = code.replace(/\D/g, "");
+
+  // complète si un seul chiffre
   if (code.length === 1) code = "0" + code;
 
   return code.length === 2 ? code : null;
 }
 
-// 🧠 logique
-function resolveTarget(codeRaw, attemptsRaw) {
-  const attempts = Number(attemptsRaw || 0);
-  const code = normalizeCode(codeRaw);
-
-  if (attempts >= 2) return CONTACTS.sebastien;
-  if (!code) return CONTACTS.sebastien;
-  if (code === "97" || code === "98") return CONTACTS.sebastien;
-
-  return ROUTING[code] || CONTACTS.sebastien;
+function parseAttempts(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
 }
 
-// 🎯 endpoint Aircall
-app.post("/aircall/smart-routing", checkAuth, (req, res) => {
-  const code = req.body.departmentCode;
-  const attempts = req.body.attempts;
+function resolveTarget(codeRaw, attemptsRaw) {
+  const attempts = parseAttempts(attemptsRaw);
+  const code = normalizeCode(codeRaw);
 
-  const contact = resolveTarget(code, attempts);
+  if (attempts >= 2) {
+    return {
+      contact: CONTACTS.sebastien,
+      reason: "ATTEMPTS_FALLBACK",
+      code,
+      attempts,
+    };
+  }
+
+  if (!code) {
+    return {
+      contact: CONTACTS.sebastien,
+      reason: "INVALID_OR_MISSING_CODE",
+      code,
+      attempts,
+    };
+  }
+
+  if (code === "97" || code === "98") {
+    return {
+      contact: CONTACTS.sebastien,
+      reason: "DOM_ROUTED_TO_SEBASTIEN",
+      code,
+      attempts,
+    };
+  }
+
+  return {
+    contact: ROUTING[code] || CONTACTS.sebastien,
+    reason: ROUTING[code] ? "MATCH" : "UNKNOWN_CODE_FALLBACK",
+    code,
+    attempts,
+  };
+}
+
+app.post("/aircall/smart-routing", checkAuth, (req, res) => {
+  const rawCode =
+    req.body.departmentCode ??
+    req.body.code ??
+    req.body.digits ??
+    req.body.department ??
+    null;
+
+  const rawAttempts =
+    req.body.attempts ??
+    req.body.retryCount ??
+    req.body.retry_count ??
+    0;
+
+  const result = resolveTarget(rawCode, rawAttempts);
+
+  console.log("=== AIRCALL ROUTING REQUEST ===");
+  console.log("Body reçu :", JSON.stringify(req.body, null, 2));
+  console.log("rawCode :", rawCode);
+  console.log("rawAttempts :", rawAttempts);
+  console.log("normalizedCode :", result.code);
+  console.log("reason :", result.reason);
+  console.log("target :", result.contact.name, result.contact.targetValue);
+  console.log("================================");
 
   res.json({
     routing: {
-      targetType: contact.targetType,
-      targetValue: contact.targetValue
+      targetType: result.contact.targetType,
+      targetValue: result.contact.targetValue
+    },
+    meta: {
+      rawCode,
+      rawAttempts,
+      normalizedCode: result.code,
+      reason: result.reason,
+      targetName: result.contact.name
     }
   });
 });
 
-// health check
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log("API running on port " + PORT);
 });
