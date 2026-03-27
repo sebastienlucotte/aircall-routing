@@ -1,45 +1,60 @@
 const express = require("express");
-const app = express();
+const nodemailer = require("nodemailer");
 
+const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || "change-me";
 
+// SMTP Gmail
+const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
+const SMTP_SECURE = String(process.env.SMTP_SECURE || "true").toLowerCase() === "true";
+const SMTP_USER = process.env.SMTP_USER || "appel.rubiomonocoat@gmail.com";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const MAIL_FROM = process.env.MAIL_FROM || "appel.rubiomonocoat@gmail.com";
+
 const CONTACTS = {
   baptiste: {
     id: "baptiste",
     name: "Baptiste Verriele",
+    email: "baptiste@rubiomonocoat.fr",
     targetType: "external",
     targetValue: "+33675859240",
   },
   guillaume: {
     id: "guillaume",
     name: "Guillaume Nepveu",
+    email: "guillaume@rubiomonocoat.fr",
     targetType: "external",
     targetValue: "+33607122212",
   },
   laurent: {
     id: "laurent",
     name: "Laurent Moreau",
+    email: "laurent@rubiomonocoat.fr",
     targetType: "external",
     targetValue: "+33608660394",
   },
   antony: {
     id: "antony",
     name: "Antony Grasser",
+    email: "antony@rubiomonocoat.fr",
     targetType: "external",
     targetValue: "+33698281840",
   },
   benjamin: {
     id: "benjamin",
     name: "Benjamin Hardial",
+    email: "benjamin@rubiomonocoat.fr",
     targetType: "external",
     targetValue: "+33786358881",
   },
   sebastien: {
     id: "sebastien",
     name: "Sébastien",
+    email: "sebastien@rubiomonocoat.fr",
     targetType: "external",
     targetValue: "+33621414949",
   },
@@ -168,7 +183,6 @@ function normalizeCode(input) {
   if (input == null) return null;
 
   let code = String(input).trim().toUpperCase();
-
   code = code.replace(/#/g, "");
 
   if (code === "2A" || code === "2B" || code === "20") {
@@ -228,7 +242,59 @@ function resolveTarget(codeRaw, attemptsRaw) {
   };
 }
 
-app.post("/aircall/smart-routing", checkAuth, (req, res) => {
+function getTransporter() {
+  if (!SMTP_USER || !SMTP_PASS) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
+    },
+  });
+}
+
+async function sendSectorEmail({ contact, departmentCode, callerNumber, callerName, callId }) {
+  const transporter = getTransporter();
+
+  if (!transporter) {
+    console.log("EMAIL NOT SENT: SMTP non configuré.");
+    return;
+  }
+
+  const subject = `Nouvel appel secteur ${departmentCode || "non défini"} - ${contact.name}`;
+
+  const lines = [
+    `Bonjour ${contact.name},`,
+    ``,
+    `Un appel client a été dirigé vers votre secteur.`,
+    ``,
+    `Commercial ciblé : ${contact.name}`,
+    `Département saisi : ${departmentCode || "Non renseigné"}`,
+    `Numéro appelant : ${callerNumber || "Non remonté"}`,
+    `Nom appelant : ${callerName || "Non remonté"}`,
+    `ID appel : ${callId || "Non remonté"}`,
+    `Numéro routé : ${contact.targetValue}`,
+    `Date : ${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}`,
+    ``,
+    `Email automatique généré par l'API de routage Aircall.`,
+  ];
+
+  await transporter.sendMail({
+    from: MAIL_FROM,
+    to: contact.email,
+    subject,
+    text: lines.join("\n"),
+  });
+
+  console.log(`EMAIL SENT TO ${contact.email}`);
+}
+
+app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   const rawCode =
     req.body.departmentCode ??
     req.body.code ??
@@ -271,8 +337,20 @@ app.post("/aircall/smart-routing", checkAuth, (req, res) => {
   console.log("callId :", callId);
   console.log("normalizedCode :", result.code);
   console.log("reason :", result.reason);
-  console.log("target :", result.contact.name, result.contact.targetValue);
+  console.log("target :", result.contact.name, result.contact.targetValue, result.contact.email);
   console.log("================================");
+
+  try {
+    await sendSectorEmail({
+      contact: result.contact,
+      departmentCode: result.code,
+      callerNumber,
+      callerName,
+      callId,
+    });
+  } catch (error) {
+    console.error("EMAIL ERROR:", error);
+  }
 
   res.json({
     routing: {
@@ -288,6 +366,7 @@ app.post("/aircall/smart-routing", checkAuth, (req, res) => {
       normalizedCode: result.code,
       reason: result.reason,
       selected: result.contact.name,
+      selectedEmail: result.contact.email,
     },
   });
 });
