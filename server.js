@@ -1,9 +1,4 @@
 require("dotenv").config();
-<<<<<<< HEAD
-const express = require("express");
-const nodemailer = require("nodemailer");
-
-=======
 
 console.log("ENV TEST:");
 console.log(process.env.GOOGLE_SHEETS_SPREADSHEET_ID);
@@ -14,7 +9,6 @@ const express = require("express");
 const nodemailer = require("nodemailer");
 const { google } = require("googleapis");
 
->>>>>>> 8d59572 (ready for deploy)
 const app = express();
 app.use(express.json());
 
@@ -25,13 +19,6 @@ const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || "change-me";
 const SMTP_HOST = "smtp.gmail.com";
 const SMTP_PORT = 465;
 const SMTP_SECURE = true;
-<<<<<<< HEAD
-
-const SMTP_USER = "appel.rubiomonocoat@gmail.com";
-const SMTP_PASS = process.env.SMTP_PASS;
-
-const MAIL_FROM = "appel.rubiomonocoat@gmail.com";
-=======
 const SMTP_USER = "appel.rubiomonocoat@gmail.com";
 const SMTP_PASS = process.env.SMTP_PASS;
 const MAIL_FROM = "appel.rubiomonocoat@gmail.com";
@@ -42,7 +29,6 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY =
   process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
 const SHEET_NAME = "Logs";
->>>>>>> 8d59572 (ready for deploy)
 
 const CONTACTS = {
   baptiste: {
@@ -291,9 +277,6 @@ function getTransporter() {
   });
 }
 
-<<<<<<< HEAD
-async function sendSectorEmail({ contact, departmentCode, callerNumber, callerName, callId }) {
-=======
 async function sendSectorEmail({
   contact,
   departmentCode,
@@ -301,7 +284,6 @@ async function sendSectorEmail({
   callerName,
   callId,
 }) {
->>>>>>> 8d59572 (ready for deploy)
   const transporter = getTransporter();
 
   if (!transporter) {
@@ -337,8 +319,6 @@ async function sendSectorEmail({
   console.log(`EMAIL SENT TO ${contact.email}`);
 }
 
-<<<<<<< HEAD
-=======
 async function appendRoutingLogToSheet({
   rawCode,
   normalizedCode,
@@ -408,7 +388,6 @@ async function appendRoutingLogToSheet({
   }
 }
 
->>>>>>> 8d59572 (ready for deploy)
 app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   const rawCode =
     req.body.departmentCode ??
@@ -452,21 +431,6 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   console.log("callId :", callId);
   console.log("normalizedCode :", result.code);
   console.log("reason :", result.reason);
-<<<<<<< HEAD
-  console.log("target :", result.contact.name, result.contact.targetValue, result.contact.email);
-  console.log("================================");
-
-  try {
-    await sendSectorEmail({
-      contact: result.contact,
-      departmentCode: result.code,
-      callerNumber,
-      callerName,
-      callId,
-    });
-  } catch (error) {
-    console.error("EMAIL ERROR:", error);
-=======
   console.log(
     "target :",
     result.contact.name,
@@ -475,31 +439,33 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   );
   console.log("================================");
 
-  try {
-    await Promise.allSettled([
-      sendSectorEmail({
-        contact: result.contact,
-        departmentCode: result.code,
-        callerNumber,
-        callerName,
-        callId,
-      }),
-      appendRoutingLogToSheet({
-        rawCode,
-        normalizedCode: result.code,
-        attempts: result.attempts,
-        reason: result.reason,
-        contact: result.contact,
-        callerNumber,
-        callerName,
-        callId,
-        payload: req.body,
-      }),
-    ]);
-  } catch (error) {
-    console.error("POST-PROCESS ERROR:", error);
->>>>>>> 8d59572 (ready for deploy)
-  }
+  const emailPromise = sendSectorEmail({
+    contact: result.contact,
+    departmentCode: result.code,
+    callerNumber,
+    callerName,
+    callId,
+  });
+
+  const sheetPromise = appendRoutingLogToSheet({
+    rawCode,
+    normalizedCode: result.code,
+    attempts: result.attempts,
+    reason: result.reason,
+    contact: result.contact,
+    callerNumber,
+    callerName,
+    callId,
+    payload: req.body,
+  });
+
+  const results = await Promise.allSettled([emailPromise, sheetPromise]);
+
+  results.forEach((r, i) => {
+    if (r.status === "rejected") {
+      console.error(i === 0 ? "EMAIL ERROR:" : "SHEETS ERROR:", r.reason);
+    }
+  });
 
   res.json({
     routing: {
@@ -524,8 +490,6 @@ app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-<<<<<<< HEAD
-=======
 console.log("ROUTE /test-sheet chargée");
 
 app.get("/test-sheet", async (req, res) => {
@@ -553,7 +517,6 @@ app.get("/test-sheet", async (req, res) => {
   }
 });
 
->>>>>>> 8d59572 (ready for deploy)
 app.listen(PORT, "0.0.0.0", () => {
   console.log("API running on port " + PORT);
 });
