@@ -135,7 +135,7 @@ const ROUTING = {
   "12": CONTACTS.benjamin,
   "13": CONTACTS.benjamin,
   "15": CONTACTS.benjamin,
-  "20": CONTACTS.benjamin, // Corse = 2A + 2B
+  "20": CONTACTS.benjamin,
   "26": CONTACTS.benjamin,
   "30": CONTACTS.benjamin,
   "34": CONTACTS.benjamin,
@@ -169,18 +169,14 @@ function normalizeCode(input) {
 
   let code = String(input).trim().toUpperCase();
 
-  // retire le #
   code = code.replace(/#/g, "");
 
-  // gestion Corse
   if (code === "2A" || code === "2B" || code === "20") {
     return "20";
   }
 
-  // garde uniquement les chiffres
   code = code.replace(/\D/g, "");
 
-  // complète si un seul chiffre
   if (code.length === 1) {
     code = "0" + code;
   }
@@ -246,12 +242,33 @@ app.post("/aircall/smart-routing", checkAuth, (req, res) => {
     req.body.retry_count ??
     0;
 
+  const callerNumber =
+    req.body.callerNumber ??
+    req.body.from ??
+    req.body.caller_number ??
+    null;
+
+  const callerName =
+    req.body.callerName ??
+    req.body.name ??
+    req.body.caller_name ??
+    null;
+
+  const callId =
+    req.body.callId ??
+    req.body.call_id ??
+    req.body.id ??
+    null;
+
   const result = resolveTarget(rawCode, rawAttempts);
 
   console.log("=== AIRCALL ROUTING REQUEST ===");
   console.log("Body reçu :", JSON.stringify(req.body, null, 2));
   console.log("rawCode :", rawCode);
   console.log("rawAttempts :", rawAttempts);
+  console.log("callerNumber :", callerNumber);
+  console.log("callerName :", callerName);
+  console.log("callId :", callId);
   console.log("normalizedCode :", result.code);
   console.log("reason :", result.reason);
   console.log("target :", result.contact.name, result.contact.targetValue);
@@ -265,6 +282,9 @@ app.post("/aircall/smart-routing", checkAuth, (req, res) => {
     meta: {
       receivedDepartmentCode: rawCode,
       receivedAttempts: rawAttempts,
+      callerNumber,
+      callerName,
+      callId,
       normalizedCode: result.code,
       reason: result.reason,
       selected: result.contact.name,
