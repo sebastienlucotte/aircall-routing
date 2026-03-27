@@ -12,7 +12,7 @@ const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_SECURE = String(process.env.SMTP_SECURE || "true").toLowerCase() === "true";
 const SMTP_USER = process.env.SMTP_USER || "appel.rubiomonocoat@gmail.com";
-const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_PASS = process.env.SMTP_PASS || "Rubio1906!@";
 const MAIL_FROM = process.env.MAIL_FROM || "appel.rubiomonocoat@gmail.com";
 
 const CONTACTS = {
