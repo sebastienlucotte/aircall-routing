@@ -1,7 +1,20 @@
 require("dotenv").config();
+<<<<<<< HEAD
 const express = require("express");
 const nodemailer = require("nodemailer");
 
+=======
+
+console.log("ENV TEST:");
+console.log(process.env.GOOGLE_SHEETS_SPREADSHEET_ID);
+console.log(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+console.log(!!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
+
+const express = require("express");
+const nodemailer = require("nodemailer");
+const { google } = require("googleapis");
+
+>>>>>>> 8d59572 (ready for deploy)
 const app = express();
 app.use(express.json());
 
@@ -12,11 +25,24 @@ const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || "change-me";
 const SMTP_HOST = "smtp.gmail.com";
 const SMTP_PORT = 465;
 const SMTP_SECURE = true;
+<<<<<<< HEAD
 
 const SMTP_USER = "appel.rubiomonocoat@gmail.com";
 const SMTP_PASS = process.env.SMTP_PASS;
 
 const MAIL_FROM = "appel.rubiomonocoat@gmail.com";
+=======
+const SMTP_USER = "appel.rubiomonocoat@gmail.com";
+const SMTP_PASS = process.env.SMTP_PASS;
+const MAIL_FROM = "appel.rubiomonocoat@gmail.com";
+
+// Google Sheets
+const SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY =
+  process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
+const SHEET_NAME = "Logs";
+>>>>>>> 8d59572 (ready for deploy)
 
 const CONTACTS = {
   baptiste: {
@@ -172,13 +198,17 @@ const ROUTING = {
 
 function checkAuth(req, res, next) {
   const header = req.headers.authorization || "";
+
   if (!header.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Missing bearer token" });
   }
+
   const token = header.slice(7);
+
   if (token !== API_BEARER_TOKEN) {
     return res.status(401).json({ error: "Invalid bearer token" });
   }
+
   next();
 }
 
@@ -261,7 +291,17 @@ function getTransporter() {
   });
 }
 
+<<<<<<< HEAD
 async function sendSectorEmail({ contact, departmentCode, callerNumber, callerName, callId }) {
+=======
+async function sendSectorEmail({
+  contact,
+  departmentCode,
+  callerNumber,
+  callerName,
+  callId,
+}) {
+>>>>>>> 8d59572 (ready for deploy)
   const transporter = getTransporter();
 
   if (!transporter) {
@@ -297,6 +337,78 @@ async function sendSectorEmail({ contact, departmentCode, callerNumber, callerNa
   console.log(`EMAIL SENT TO ${contact.email}`);
 }
 
+<<<<<<< HEAD
+=======
+async function appendRoutingLogToSheet({
+  rawCode,
+  normalizedCode,
+  attempts,
+  reason,
+  contact,
+  callerNumber,
+  callerName,
+  callId,
+  payload,
+}) {
+  if (!SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+    console.log("SHEETS NOT WRITTEN: configuration Google manquante.");
+    return;
+  }
+
+  const auth = new google.auth.JWT({
+    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  const sheets = google.sheets({ version: "v4", auth });
+
+  const values = [[
+    new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" }),
+    callId || "",
+    callerName || "",
+    callerNumber || "",
+    rawCode || "",
+    normalizedCode || "",
+    attempts ?? 0,
+    reason || "",
+    contact?.name || "",
+    contact?.email || "",
+    contact?.targetValue || "",
+    JSON.stringify(payload || {}),
+  ]];
+
+  console.log("AVANT GOOGLE SHEETS");
+  console.log("SHEET_ID =", SHEET_ID);
+  console.log("SHEET_NAME =", SHEET_NAME);
+  console.log("VALUES =", JSON.stringify(values));
+
+  try {
+    const response = await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: `${SHEET_NAME}!A:L`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values },
+    });
+
+    console.log("APRES GOOGLE SHEETS");
+    console.log("GOOGLE SHEETS OK:", response.status);
+    console.log("GOOGLE SHEETS UPDATED RANGE:", response.data?.updates?.updatedRange);
+    console.log("GOOGLE SHEETS UPDATED CELLS:", response.data?.updates?.updatedCells);
+  } catch (error) {
+    console.error("GOOGLE SHEETS ERROR MESSAGE:", error.message);
+    if (error.response?.data) {
+      console.error(
+        "GOOGLE SHEETS ERROR DATA:",
+        JSON.stringify(error.response.data, null, 2)
+      );
+    }
+    throw error;
+  }
+}
+
+>>>>>>> 8d59572 (ready for deploy)
 app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   const rawCode =
     req.body.departmentCode ??
@@ -340,6 +452,7 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   console.log("callId :", callId);
   console.log("normalizedCode :", result.code);
   console.log("reason :", result.reason);
+<<<<<<< HEAD
   console.log("target :", result.contact.name, result.contact.targetValue, result.contact.email);
   console.log("================================");
 
@@ -353,6 +466,39 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
     });
   } catch (error) {
     console.error("EMAIL ERROR:", error);
+=======
+  console.log(
+    "target :",
+    result.contact.name,
+    result.contact.targetValue,
+    result.contact.email
+  );
+  console.log("================================");
+
+  try {
+    await Promise.allSettled([
+      sendSectorEmail({
+        contact: result.contact,
+        departmentCode: result.code,
+        callerNumber,
+        callerName,
+        callId,
+      }),
+      appendRoutingLogToSheet({
+        rawCode,
+        normalizedCode: result.code,
+        attempts: result.attempts,
+        reason: result.reason,
+        contact: result.contact,
+        callerNumber,
+        callerName,
+        callId,
+        payload: req.body,
+      }),
+    ]);
+  } catch (error) {
+    console.error("POST-PROCESS ERROR:", error);
+>>>>>>> 8d59572 (ready for deploy)
   }
 
   res.json({
@@ -378,6 +524,36 @@ app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
+<<<<<<< HEAD
+=======
+console.log("ROUTE /test-sheet chargée");
+
+app.get("/test-sheet", async (req, res) => {
+  try {
+    await appendRoutingLogToSheet({
+      rawCode: "41",
+      normalizedCode: "41",
+      attempts: 0,
+      reason: "TEST",
+      contact: {
+        name: "Guillaume Nepveu",
+        email: "guillaume@rubiomonocoat.fr",
+        targetValue: "+33607122212",
+      },
+      callerNumber: "+33612345678",
+      callerName: "Test Manuel",
+      callId: "test-sheet-001",
+      payload: { ok: true },
+    });
+
+    res.json({ ok: true, message: "Test Google Sheets envoyé" });
+  } catch (error) {
+    console.error("TEST SHEETS ERROR:", error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+>>>>>>> 8d59572 (ready for deploy)
 app.listen(PORT, "0.0.0.0", () => {
   console.log("API running on port " + PORT);
 });
