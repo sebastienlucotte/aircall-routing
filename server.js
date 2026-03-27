@@ -13,7 +13,7 @@ const SMTP_PORT = 465;
 const SMTP_SECURE = true;
 
 const SMTP_USER = "appel.rubiomonocoat@gmail.com";
-const SMTP_PASS = "ivbtfnwdzirqpza";
+const SMTP_PASS = process.env.SMTP_PASS;
 
 const MAIL_FROM = "appel.rubiomonocoat@gmail.com";
 
