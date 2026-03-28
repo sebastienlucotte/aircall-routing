@@ -1,13 +1,5 @@
 require("dotenv").config();
 
-console.log("ENV TEST:");
-console.log("SHEET_ID =", process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "MISSING");
-console.log("SERVICE_ACCOUNT_EMAIL =", process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "MISSING");
-console.log(
-  "PRIVATE_KEY_OK =",
-  process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ? "YES" : "NO"
-);
-
 const express = require("express");
 const nodemailer = require("nodemailer");
 const { google } = require("googleapis");
@@ -230,18 +222,22 @@ function parseDurationSeconds(value) {
   return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
 }
 
-function inferTransferOutcome(durationSeconds) {
+function inferCallStatus(durationSeconds) {
   const duration = parseDurationSeconds(durationSeconds);
 
+  if (duration <= 0) {
+    return "en_cours";
+  }
+
   if (duration >= 60) {
-    return "REPONDU";
+    return "appel";
   }
 
   if (duration >= 20) {
-    return "MESSAGERIE_PROBABLE";
+    return "messagerie";
   }
 
-  return "ECHEC_OU_REFUS";
+  return "refusé";
 }
 
 function resolveTarget(codeRaw, attemptsRaw) {
@@ -342,31 +338,17 @@ async function sendSectorEmail({
 }
 
 async function appendRoutingLogToSheet({
-  departmentCode,
-  rawCode,
-  normalizedCode,
-  attempts,
-  reason,
-  contact,
   callerNumber,
-  callerName,
-  callId,
-  transferDuration,
-  transferOutcome,
-  payload,
+  postalCode,
+  reason,
+  selected,
+  selectedEmail,
+  targetValue,
+  status,
+  duration,
 }) {
-  if (!SHEET_ID) {
-    console.log("MISSING: GOOGLE_SHEETS_SPREADSHEET_ID");
-    return;
-  }
-
-  if (!GOOGLE_SERVICE_ACCOUNT_EMAIL) {
-    console.log("MISSING: GOOGLE_SERVICE_ACCOUNT_EMAIL");
-    return;
-  }
-
-  if (!GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
-    console.log("MISSING: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY");
+  if (!SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+    console.log("SHEETS NOT WRITTEN: configuration Google manquante.");
     return;
   }
 
@@ -379,27 +361,21 @@ async function appendRoutingLogToSheet({
   const sheets = google.sheets({ version: "v4", auth });
 
   const values = [[
-    new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" }),
-    callId || "",
-    callerName || "",
-    callerNumber || "",
-    departmentCode || "",
-    rawCode || "",
-    normalizedCode || "",
-    attempts ?? 0,
-    reason || "",
-    contact?.name || "",
-    contact?.email || "",
-    contact?.targetValue || "",
-    transferDuration ?? 0,
-    transferOutcome || "",
-    JSON.stringify(payload || {}),
+    new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" }), // A
+    callerNumber || "", // B
+    postalCode || "", // C
+    reason || "", // D
+    selected || "", // E
+    selectedEmail || "", // F
+    targetValue || "", // G
+    status || "", // H
+    duration ?? 0, // I
   ]];
 
   try {
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!A:O`,
+      range: `${SHEET_NAME}!A:I`,
       valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values },
@@ -451,7 +427,7 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
     req.body.id ??
     null;
 
-  const transferDuration = parseDurationSeconds(
+  const duration = parseDurationSeconds(
     req.body.transferDuration ??
       req.body.transfer_duration ??
       req.body.duration ??
@@ -461,50 +437,38 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   );
 
   const result = resolveTarget(rawCode, rawAttempts);
-  const departmentCode = result.code || "";
-  const transferOutcome = inferTransferOutcome(transferDuration);
+  const postalCode = result.code || "";
+  const status = inferCallStatus(duration);
 
   console.log("=== AIRCALL ROUTING REQUEST ===");
   console.log("Body reçu :", JSON.stringify(req.body, null, 2));
-  console.log("rawCode :", rawCode);
-  console.log("rawAttempts :", rawAttempts);
   console.log("callerNumber :", callerNumber);
-  console.log("callerName :", callerName);
-  console.log("callId :", callId);
-  console.log("departmentCode :", departmentCode);
-  console.log("normalizedCode :", result.code);
+  console.log("postalCode :", postalCode);
   console.log("reason :", result.reason);
-  console.log("transferDuration :", transferDuration);
-  console.log("transferOutcome :", transferOutcome);
-  console.log(
-    "target :",
-    result.contact.name,
-    result.contact.targetValue,
-    result.contact.email
-  );
+  console.log("selected :", result.contact.name);
+  console.log("selectedEmail :", result.contact.email);
+  console.log("targetValue :", result.contact.targetValue);
+  console.log("status :", status);
+  console.log("duration :", duration);
   console.log("================================");
 
   const emailPromise = sendSectorEmail({
     contact: result.contact,
-    departmentCode: departmentCode,
+    departmentCode: postalCode,
     callerNumber,
     callerName,
     callId,
   });
 
   const sheetPromise = appendRoutingLogToSheet({
-    departmentCode,
-    rawCode,
-    normalizedCode: result.code,
-    attempts: result.attempts,
-    reason: result.reason,
-    contact: result.contact,
     callerNumber,
-    callerName,
-    callId,
-    transferDuration,
-    transferOutcome,
-    payload: req.body,
+    postalCode,
+    reason: result.reason,
+    selected: result.contact.name,
+    selectedEmail: result.contact.email,
+    targetValue: result.contact.targetValue,
+    status,
+    duration,
   });
 
   const results = await Promise.allSettled([emailPromise, sheetPromise]);
@@ -521,18 +485,15 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
       targetValue: result.contact.targetValue,
     },
     meta: {
-      receivedDepartmentCode: rawCode,
-      receivedAttempts: rawAttempts,
       callerNumber,
-      callerName,
-      callId,
-      departmentCode,
-      normalizedCode: result.code,
+      postalCode,
       reason: result.reason,
-      transferDuration,
-      transferOutcome,
       selected: result.contact.name,
       selectedEmail: result.contact.email,
+      targetValue: result.contact.targetValue,
+      status,
+      duration,
+      callId,
     },
   });
 });
@@ -544,22 +505,14 @@ app.get("/health", (req, res) => {
 app.get("/test-sheet", async (req, res) => {
   try {
     await appendRoutingLogToSheet({
-      departmentCode: "41",
-      rawCode: "41",
-      normalizedCode: "41",
-      attempts: 0,
-      reason: "TEST",
-      contact: {
-        name: "Guillaume Nepveu",
-        email: "guillaume@rubiomonocoat.fr",
-        targetValue: "+33607122212",
-      },
       callerNumber: "+33612345678",
-      callerName: "Test Manuel",
-      callId: "test-sheet-001",
-      transferDuration: 75,
-      transferOutcome: inferTransferOutcome(75),
-      payload: { ok: true },
+      postalCode: "41",
+      reason: "TEST",
+      selected: "Guillaume Nepveu",
+      selectedEmail: "guillaume@rubiomonocoat.fr",
+      targetValue: "+33607122212",
+      status: inferCallStatus(75),
+      duration: 75,
     });
 
     res.json({ ok: true, message: "Test Google Sheets envoyé" });
