@@ -10,601 +10,188 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN || "change-me";
 
-// SMTP Gmail
-const SMTP_HOST = "smtp.gmail.com";
-const SMTP_PORT = 465;
-const SMTP_SECURE = true;
-const SMTP_USER = "appel.rubiomonocoat@gmail.com";
-const SMTP_PASS = process.env.SMTP_PASS;
-const MAIL_FROM = "appel.rubiomonocoat@gmail.com";
+// ===== SMTP =====
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: "appel.rubiomonocoat@gmail.com",
+    pass: process.env.SMTP_PASS,
+  },
+});
 
-// Google Sheets
+// ===== GOOGLE SHEETS =====
 const SHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY =
-  process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
 const SHEET_NAME = "Logs";
 
-const CONTACTS = {
-  baptiste: {
-    id: "baptiste",
-    name: "Baptiste Verriele",
-    email: "baptiste@rubiomonocoat.fr",
-    targetType: "external",
-    targetValue: "+33675859240",
-  },
-  guillaume: {
-    id: "guillaume",
-    name: "Guillaume Nepveu",
-    email: "guillaume@rubiomonocoat.fr",
-    targetType: "external",
-    targetValue: "+33607122212",
-  },
-  laurent: {
-    id: "laurent",
-    name: "Laurent Moreau",
-    email: "laurent@rubiomonocoat.fr",
-    targetType: "external",
-    targetValue: "+33608660394",
-  },
-  antony: {
-    id: "antony",
-    name: "Antony Grasser",
-    email: "antony@rubiomonocoat.fr",
-    targetType: "external",
-    targetValue: "+33698281840",
-  },
-  benjamin: {
-    id: "benjamin",
-    name: "Benjamin Hardial",
-    email: "benjamin@rubiomonocoat.fr",
-    targetType: "external",
-    targetValue: "+33786358881",
-  },
-  sebastien: {
-    id: "sebastien",
-    name: "Sébastien",
-    email: "sebastien@rubiomonocoat.fr",
-    targetType: "external",
-    targetValue: "+33621414949",
-  },
-};
+const auth = new google.auth.JWT({
+  email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+  key: process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+});
 
-const ROUTING = {
-  // Nord / IDF
-  "02": CONTACTS.baptiste,
-  "08": CONTACTS.baptiste,
-  "27": CONTACTS.baptiste,
-  "51": CONTACTS.baptiste,
-  "59": CONTACTS.baptiste,
-  "60": CONTACTS.baptiste,
-  "62": CONTACTS.baptiste,
-  "75": CONTACTS.baptiste,
-  "76": CONTACTS.baptiste,
-  "77": CONTACTS.baptiste,
-  "78": CONTACTS.baptiste,
-  "80": CONTACTS.baptiste,
-  "91": CONTACTS.baptiste,
-  "92": CONTACTS.baptiste,
-  "93": CONTACTS.baptiste,
-  "94": CONTACTS.baptiste,
-  "95": CONTACTS.baptiste,
+const sheets = google.sheets({ version: "v4", auth });
 
-  // Ouest
-  "03": CONTACTS.guillaume,
-  "14": CONTACTS.guillaume,
-  "18": CONTACTS.guillaume,
-  "22": CONTACTS.guillaume,
-  "28": CONTACTS.guillaume,
-  "29": CONTACTS.guillaume,
-  "35": CONTACTS.guillaume,
-  "36": CONTACTS.guillaume,
-  "37": CONTACTS.guillaume,
-  "41": CONTACTS.guillaume,
-  "44": CONTACTS.guillaume,
-  "45": CONTACTS.guillaume,
-  "49": CONTACTS.guillaume,
-  "50": CONTACTS.guillaume,
-  "53": CONTACTS.guillaume,
-  "56": CONTACTS.guillaume,
-  "58": CONTACTS.guillaume,
-  "61": CONTACTS.guillaume,
-  "72": CONTACTS.guillaume,
-  "85": CONTACTS.guillaume,
-  "89": CONTACTS.guillaume,
-
-  // Sud-Ouest
-  "09": CONTACTS.laurent,
-  "16": CONTACTS.laurent,
-  "17": CONTACTS.laurent,
-  "19": CONTACTS.laurent,
-  "23": CONTACTS.laurent,
-  "24": CONTACTS.laurent,
-  "31": CONTACTS.laurent,
-  "32": CONTACTS.laurent,
-  "33": CONTACTS.laurent,
-  "40": CONTACTS.laurent,
-  "46": CONTACTS.laurent,
-  "47": CONTACTS.laurent,
-  "64": CONTACTS.laurent,
-  "65": CONTACTS.laurent,
-  "79": CONTACTS.laurent,
-  "81": CONTACTS.laurent,
-  "82": CONTACTS.laurent,
-  "86": CONTACTS.laurent,
-  "87": CONTACTS.laurent,
-
-  // Est
-  "01": CONTACTS.antony,
-  "10": CONTACTS.antony,
-  "21": CONTACTS.antony,
-  "25": CONTACTS.antony,
-  "39": CONTACTS.antony,
-  "52": CONTACTS.antony,
-  "54": CONTACTS.antony,
-  "55": CONTACTS.antony,
-  "57": CONTACTS.antony,
-  "67": CONTACTS.antony,
-  "68": CONTACTS.antony,
-  "70": CONTACTS.antony,
-  "71": CONTACTS.antony,
-  "88": CONTACTS.antony,
-  "90": CONTACTS.antony,
-
-  // Sud-Est
-  "04": CONTACTS.benjamin,
-  "05": CONTACTS.benjamin,
-  "06": CONTACTS.benjamin,
-  "07": CONTACTS.benjamin,
-  "11": CONTACTS.benjamin,
-  "12": CONTACTS.benjamin,
-  "13": CONTACTS.benjamin,
-  "15": CONTACTS.benjamin,
-  "20": CONTACTS.benjamin,
-  "26": CONTACTS.benjamin,
-  "30": CONTACTS.benjamin,
-  "34": CONTACTS.benjamin,
-  "38": CONTACTS.benjamin,
-  "42": CONTACTS.benjamin,
-  "43": CONTACTS.benjamin,
-  "48": CONTACTS.benjamin,
-  "63": CONTACTS.benjamin,
-  "66": CONTACTS.benjamin,
-  "69": CONTACTS.benjamin,
-  "73": CONTACTS.benjamin,
-  "74": CONTACTS.benjamin,
-  "83": CONTACTS.benjamin,
-  "84": CONTACTS.benjamin,
-};
-
+// ===== AUTH =====
 function checkAuth(req, res, next) {
-  const header = req.headers.authorization || "";
-
-  if (!header.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing bearer token" });
-  }
-
-  const token = header.slice(7);
-
+  const token = req.headers.authorization?.replace("Bearer ", "");
   if (token !== API_BEARER_TOKEN) {
-    return res.status(401).json({ error: "Invalid bearer token" });
+    return res.status(401).json({ error: "Unauthorized" });
   }
-
   next();
 }
 
+// ===== HELPERS =====
 function normalizeCode(input) {
-  if (input == null) return "";
-
-  let code = String(input).trim().toUpperCase();
-  code = code.replace(/#/g, "");
-
-  if (code === "2A" || code === "2B" || code === "20") {
-    return "20";
-  }
-
-  code = code.replace(/\D/g, "");
-
-  if (code.length === 1) {
-    code = "0" + code;
-  }
-
-  return code.length === 2 ? code : "";
+  if (!input) return "";
+  let code = String(input).replace(/\D/g, "");
+  return code.length === 1 ? "0" + code : code.slice(0, 2);
 }
 
-function parseAttempts(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
+function parseDuration(value) {
+  return Number.isFinite(Number(value)) ? Math.round(value) : 0;
 }
 
-function parseDurationSeconds(value) {
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
-}
-
-function inferCallStatus(durationSeconds) {
-  const duration = parseDurationSeconds(durationSeconds);
-
-  if (duration <= 0) {
-    return "en_cours";
-  }
-
-  if (duration >= 60) {
-    return "appel";
-  }
-
-  if (duration >= 20) {
-    return "messagerie";
-  }
-
+function getStatus(duration) {
+  if (duration <= 0) return "en_cours";
+  if (duration >= 60) return "appel";
+  if (duration >= 20) return "messagerie";
   return "refusé";
 }
 
-function resolveTarget(codeRaw, attemptsRaw) {
-  const attempts = parseAttempts(attemptsRaw);
-  const code = normalizeCode(codeRaw);
+// ===== ROUTING =====
+const CONTACTS = {
+  baptiste: { name: "Baptiste", phone: "+33675859240", email: "baptiste@rubiomonocoat.fr" },
+  guillaume: { name: "Guillaume", phone: "+33607122212", email: "guillaume@rubiomonocoat.fr" },
+  sebastien: { name: "Sébastien", phone: "+33621414949", email: "sebastien@rubiomonocoat.fr" },
+};
 
-  if (attempts >= 2) {
-    return {
-      contact: CONTACTS.sebastien,
-      reason: "ATTEMPTS_FALLBACK",
-      code,
-      attempts,
-    };
-  }
+const ROUTING = {
+  "75": CONTACTS.baptiste,
+  "41": CONTACTS.guillaume,
+};
 
-  if (!code) {
-    return {
-      contact: CONTACTS.sebastien,
-      reason: "INVALID_OR_MISSING_CODE",
-      code,
-      attempts,
-    };
-  }
-
-  if (code === "97" || code === "98") {
-    return {
-      contact: CONTACTS.sebastien,
-      reason: "DOM_ROUTED_TO_SEBASTIEN",
-      code,
-      attempts,
-    };
-  }
-
-  return {
-    contact: ROUTING[code] || CONTACTS.sebastien,
-    reason: ROUTING[code] ? "MATCH" : "UNKNOWN_CODE_FALLBACK",
-    code,
-    attempts,
-  };
-}
-
-function getTransporter() {
-  if (!SMTP_USER || !SMTP_PASS) {
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
+// ===== GOOGLE SHEETS =====
+async function appendRow(data) {
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!A:J`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[
+        new Date().toLocaleString("fr-FR"),
+        data.callerNumber,
+        data.departmentCode,
+        data.reason,
+        data.selected,
+        data.email,
+        data.target,
+        data.status,
+        data.duration,
+        data.callId,
+      ]],
     },
   });
 }
 
-function getSheetsClient() {
-  if (!SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
-    return null;
-  }
-
-  const auth = new google.auth.JWT({
-    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  return google.sheets({ version: "v4", auth });
-}
-
-async function sendSectorEmail({
-  contact,
-  departmentCode,
-  callerNumber,
-  callerName,
-  callId,
-}) {
-  const transporter = getTransporter();
-
-  if (!transporter) {
-    console.log("EMAIL NOT SENT: SMTP non configuré.");
-    return;
-  }
-
-  const subject = `Nouvel appel secteur ${departmentCode || "non défini"} - ${contact.name}`;
-
-  const lines = [
-    `Bonjour ${contact.name},`,
-    ``,
-    `Un appel client a été dirigé vers votre secteur.`,
-    ``,
-    `Commercial ciblé : ${contact.name}`,
-    `Département saisi : ${departmentCode || "Non renseigné"}`,
-    `Numéro appelant : ${callerNumber || "Non remonté"}`,
-    `Nom appelant : ${callerName || "Non remonté"}`,
-    `ID appel : ${callId || "Non remonté"}`,
-    `Numéro routé : ${contact.targetValue}`,
-    `Date : ${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}`,
-    ``,
-    `Email automatique généré par l'API de routage Aircall.`,
-  ];
-
-  await transporter.sendMail({
-    from: MAIL_FROM,
-    to: contact.email,
-    subject,
-    text: lines.join("\n"),
-  });
-
-  console.log(`EMAIL SENT TO ${contact.email}`);
-}
-
-async function appendRoutingLogToSheet({
-  callerNumber,
-  departmentCode,
-  reason,
-  selected,
-  selectedEmail,
-  targetValue,
-  status,
-  duration,
-  callId,
-}) {
-  const sheets = getSheetsClient();
-
-  if (!sheets) {
-    console.log("SHEETS NOT WRITTEN: configuration Google manquante.");
-    return;
-  }
-
-  const values = [[
-    new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" }), // A
-    callerNumber || "", // B
-    departmentCode || "", // C
-    reason || "", // D
-    selected || "", // E
-    selectedEmail || "", // F
-    targetValue || "", // G
-    status || "", // H
-    duration ?? 0, // I
-    callId || "", // J
-  ]];
-
-  const response = await sheets.spreadsheets.values.append({
-    spreadsheetId: SHEET_ID,
-    range: `${SHEET_NAME}!A:J`,
-    valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values },
-  });
-
-  console.log("GOOGLE SHEETS APPEND OK:", response.status);
-  console.log("GOOGLE SHEETS UPDATED RANGE:", response.data?.updates?.updatedRange);
-}
-
-async function findRowByCallId(callId) {
-  const sheets = getSheetsClient();
-
-  if (!sheets || !callId) {
-    return null;
-  }
-
-  const response = await sheets.spreadsheets.values.get({
+async function findRowByCaller(callerNumber) {
+  const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
     range: `${SHEET_NAME}!A:J`,
   });
 
-  const rows = response.data.values || [];
+  const rows = res.data.values || [];
 
-  // ligne 1 = headers, on commence à 2 dans Sheets
-  for (let i = 1; i < rows.length; i += 1) {
-    const row = rows[i];
-    const existingCallId = row[9] || ""; // colonne J
-
-    if (existingCallId === callId) {
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][1] === callerNumber && rows[i][7] === "en_cours") {
       return i + 1;
     }
   }
-
   return null;
 }
 
-async function updateRoutingLogInSheetByCallId({ callId, status, duration }) {
-  const sheets = getSheetsClient();
+async function updateRow(callerNumber, status, duration) {
+  const row = await findRowByCaller(callerNumber);
+  if (!row) return console.log("No row found");
 
-  if (!sheets) {
-    console.log("SHEETS UPDATE NOT WRITTEN: configuration Google manquante.");
-    return;
-  }
-
-  const rowNumber = await findRowByCallId(callId);
-
-  if (!rowNumber) {
-    console.log("SHEETS UPDATE SKIPPED: callId introuvable ->", callId);
-    return;
-  }
-
-  const response = await sheets.spreadsheets.values.update({
+  await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
-    range: `${SHEET_NAME}!H${rowNumber}:I${rowNumber}`,
+    range: `${SHEET_NAME}!H${row}:I${row}`,
     valueInputOption: "RAW",
     requestBody: {
-      values: [[status || "", duration ?? 0]],
+      values: [[status, duration]],
     },
   });
 
-  console.log("GOOGLE SHEETS UPDATE OK:", response.status);
-  console.log("GOOGLE SHEETS UPDATED RANGE:", response.data?.updatedRange);
+  console.log("UPDATED ROW", row);
 }
 
+// ===== ROUTE SMART ROUTING =====
 app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
-  const rawCode =
-    req.body.departmentCode ??
-    req.body.code ??
-    req.body.digits ??
-    req.body.department ??
-    null;
+  console.log("=== SMART ROUTING ===");
+  console.log(JSON.stringify(req.body, null, 2));
 
-  const rawAttempts =
-    req.body.attempts ??
-    req.body.retryCount ??
-    req.body.retry_count ??
-    0;
+  const body = req.body.data || req.body;
 
-  const callerNumber =
-    req.body.callerNumber ??
-    req.body.from ??
-    req.body.caller_number ??
-    null;
+  const callerNumber = body.number || body.from || "unknown";
+  const callId = body.id || null;
 
-  const callerName =
-    req.body.callerName ??
-    req.body.name ??
-    req.body.caller_name ??
-    null;
+  const departmentCode = normalizeCode(body.raw_digits || body.digits);
 
-  const callId =
-    req.body.callId ??
-    req.body.call_id ??
-    req.body.id ??
-    null;
+  const contact = ROUTING[departmentCode] || CONTACTS.sebastien;
 
-  const result = resolveTarget(rawCode, rawAttempts);
-  const departmentCode = result.code || "";
-  const initialStatus = "en_cours";
-  const initialDuration = 0;
-
-  console.log("=== AIRCALL ROUTING REQUEST ===");
-  console.log("Body reçu :", JSON.stringify(req.body, null, 2));
-  console.log("callerNumber :", callerNumber);
-  console.log("departmentCode :", departmentCode);
-  console.log("reason :", result.reason);
-  console.log("selected :", result.contact.name);
-  console.log("selectedEmail :", result.contact.email);
-  console.log("targetValue :", result.contact.targetValue);
-  console.log("status :", initialStatus);
-  console.log("duration :", initialDuration);
-  console.log("callId :", callId);
-  console.log("================================");
-
-  // Réponse immédiate à Aircall
+  // réponse immédiate
   res.json({
     routing: {
-      targetType: result.contact.targetType,
-      targetValue: result.contact.targetValue,
-    },
-    meta: {
-      callerNumber,
-      departmentCode,
-      reason: result.reason,
-      selected: result.contact.name,
-      selectedEmail: result.contact.email,
-      targetValue: result.contact.targetValue,
-      status: initialStatus,
-      duration: initialDuration,
-      callId,
+      targetType: "external",
+      targetValue: contact.phone,
     },
   });
 
-  // Traitements non bloquants ensuite
-  sendSectorEmail({
-    contact: result.contact,
-    departmentCode,
+  // async
+  appendRow({
     callerNumber,
-    callerName,
+    departmentCode,
+    reason: "MATCH",
+    selected: contact.name,
+    email: contact.email,
+    target: contact.phone,
+    status: "en_cours",
+    duration: 0,
     callId,
-  }).catch((e) => console.error("EMAIL ERROR:", e));
+  }).catch(console.error);
 
-  appendRoutingLogToSheet({
-    callerNumber,
-    departmentCode,
-    reason: result.reason,
-    selected: result.contact.name,
-    selectedEmail: result.contact.email,
-    targetValue: result.contact.targetValue,
-    status: initialStatus,
-    duration: initialDuration,
-    callId,
-  }).catch((e) => console.error("SHEETS APPEND ERROR:", e));
+  transporter.sendMail({
+    from: "appel.rubiomonocoat@gmail.com",
+    to: contact.email,
+    subject: "Nouvel appel",
+    text: `Appel de ${callerNumber}`,
+  }).catch(console.error);
 });
 
+// ===== ROUTE CALL ENDED =====
 app.post("/aircall/call-ended", checkAuth, async (req, res) => {
-  const callId =
-    req.body.callId ??
-    req.body.call_id ??
-    req.body.id ??
-    null;
+  console.log("=== CALL ENDED ===");
+  console.log(JSON.stringify(req.body, null, 2));
 
-  const duration = parseDurationSeconds(
-    req.body.transferDuration ??
-      req.body.transfer_duration ??
-      req.body.duration ??
-      req.body.call_duration ??
-      req.body.transferred_call_duration ??
-      0
-  );
+  const body = req.body.data || req.body;
 
-  const status = inferCallStatus(duration);
+  const callerNumber = body.number || body.raw_digits;
+  const duration = parseDuration(body.duration);
 
-  console.log("=== AIRCALL CALL ENDED ===");
-  console.log("Body reçu :", JSON.stringify(req.body, null, 2));
-  console.log("callId :", callId);
-  console.log("duration :", duration);
-  console.log("status :", status);
-  console.log("==========================");
+  const status = getStatus(duration);
 
   res.json({ ok: true });
 
-  updateRoutingLogInSheetByCallId({
-    callId,
-    status,
-    duration,
-  }).catch((e) => console.error("SHEETS UPDATE ERROR:", e));
+  updateRow(callerNumber, status, duration).catch(console.error);
 });
 
+// ===== HEALTH =====
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/test-sheet", async (req, res) => {
-  try {
-    await appendRoutingLogToSheet({
-      callerNumber: "+33612345678",
-      departmentCode: "41",
-      reason: "TEST",
-      selected: "Guillaume Nepveu",
-      selectedEmail: "guillaume@rubiomonocoat.fr",
-      targetValue: "+33607122212",
-      status: "en_cours",
-      duration: 0,
-      callId: "test-sheet-001",
-    });
-
-    await updateRoutingLogInSheetByCallId({
-      callId: "test-sheet-001",
-      status: inferCallStatus(75),
-      duration: 75,
-    });
-
-    res.json({ ok: true, message: "Test Google Sheets append + update envoyé" });
-  } catch (error) {
-    console.error("TEST SHEETS ERROR:", error);
-    res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("API running on port " + PORT);
+app.listen(PORT, () => {
+  console.log("SERVER RUNNING");
 });
