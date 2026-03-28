@@ -295,6 +295,20 @@ function getTransporter() {
   });
 }
 
+function getSheetsClient() {
+  if (!SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+    return null;
+  }
+
+  const auth = new google.auth.JWT({
+    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  return google.sheets({ version: "v4", auth });
+}
+
 async function sendSectorEmail({
   contact,
   departmentCode,
@@ -339,60 +353,100 @@ async function sendSectorEmail({
 
 async function appendRoutingLogToSheet({
   callerNumber,
-  postalCode,
+  departmentCode,
   reason,
   selected,
   selectedEmail,
   targetValue,
   status,
   duration,
+  callId,
 }) {
-  if (!SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+  const sheets = getSheetsClient();
+
+  if (!sheets) {
     console.log("SHEETS NOT WRITTEN: configuration Google manquante.");
     return;
   }
 
-  const auth = new google.auth.JWT({
-    email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    key: GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-
-  const sheets = google.sheets({ version: "v4", auth });
-
   const values = [[
     new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" }), // A
     callerNumber || "", // B
-    postalCode || "", // C
+    departmentCode || "", // C
     reason || "", // D
     selected || "", // E
     selectedEmail || "", // F
     targetValue || "", // G
     status || "", // H
     duration ?? 0, // I
+    callId || "", // J
   ]];
 
-  try {
-    const response = await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!A:I`,
-      valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
-      requestBody: { values },
-    });
+  const response = await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!A:J`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values },
+  });
 
-    console.log("GOOGLE SHEETS OK:", response.status);
-    console.log("GOOGLE SHEETS UPDATED RANGE:", response.data?.updates?.updatedRange);
-  } catch (error) {
-    console.error("GOOGLE SHEETS ERROR MESSAGE:", error.message);
-    if (error.response?.data) {
-      console.error(
-        "GOOGLE SHEETS ERROR DATA:",
-        JSON.stringify(error.response.data, null, 2)
-      );
-    }
-    throw error;
+  console.log("GOOGLE SHEETS APPEND OK:", response.status);
+  console.log("GOOGLE SHEETS UPDATED RANGE:", response.data?.updates?.updatedRange);
+}
+
+async function findRowByCallId(callId) {
+  const sheets = getSheetsClient();
+
+  if (!sheets || !callId) {
+    return null;
   }
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!A:J`,
+  });
+
+  const rows = response.data.values || [];
+
+  // ligne 1 = headers, on commence à 2 dans Sheets
+  for (let i = 1; i < rows.length; i += 1) {
+    const row = rows[i];
+    const existingCallId = row[9] || ""; // colonne J
+
+    if (existingCallId === callId) {
+      return i + 1;
+    }
+  }
+
+  return null;
+}
+
+async function updateRoutingLogInSheetByCallId({ callId, status, duration }) {
+  const sheets = getSheetsClient();
+
+  if (!sheets) {
+    console.log("SHEETS UPDATE NOT WRITTEN: configuration Google manquante.");
+    return;
+  }
+
+  const rowNumber = await findRowByCallId(callId);
+
+  if (!rowNumber) {
+    console.log("SHEETS UPDATE SKIPPED: callId introuvable ->", callId);
+    return;
+  }
+
+  const response = await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!H${rowNumber}:I${rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[status || "", duration ?? 0]],
+    },
+  });
+
+  console.log("GOOGLE SHEETS UPDATE OK:", response.status);
+  console.log("GOOGLE SHEETS UPDATED RANGE:", response.data?.updatedRange);
 }
 
 app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
@@ -427,6 +481,72 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
     req.body.id ??
     null;
 
+  const result = resolveTarget(rawCode, rawAttempts);
+  const departmentCode = result.code || "";
+  const initialStatus = "en_cours";
+  const initialDuration = 0;
+
+  console.log("=== AIRCALL ROUTING REQUEST ===");
+  console.log("Body reçu :", JSON.stringify(req.body, null, 2));
+  console.log("callerNumber :", callerNumber);
+  console.log("departmentCode :", departmentCode);
+  console.log("reason :", result.reason);
+  console.log("selected :", result.contact.name);
+  console.log("selectedEmail :", result.contact.email);
+  console.log("targetValue :", result.contact.targetValue);
+  console.log("status :", initialStatus);
+  console.log("duration :", initialDuration);
+  console.log("callId :", callId);
+  console.log("================================");
+
+  // Réponse immédiate à Aircall
+  res.json({
+    routing: {
+      targetType: result.contact.targetType,
+      targetValue: result.contact.targetValue,
+    },
+    meta: {
+      callerNumber,
+      departmentCode,
+      reason: result.reason,
+      selected: result.contact.name,
+      selectedEmail: result.contact.email,
+      targetValue: result.contact.targetValue,
+      status: initialStatus,
+      duration: initialDuration,
+      callId,
+    },
+  });
+
+  // Traitements non bloquants ensuite
+  sendSectorEmail({
+    contact: result.contact,
+    departmentCode,
+    callerNumber,
+    callerName,
+    callId,
+  }).catch((e) => console.error("EMAIL ERROR:", e));
+
+  appendRoutingLogToSheet({
+    callerNumber,
+    departmentCode,
+    reason: result.reason,
+    selected: result.contact.name,
+    selectedEmail: result.contact.email,
+    targetValue: result.contact.targetValue,
+    status: initialStatus,
+    duration: initialDuration,
+    callId,
+  }).catch((e) => console.error("SHEETS APPEND ERROR:", e));
+});
+
+app.post("/aircall/call-ended", checkAuth, async (req, res) => {
+  const callId =
+    req.body.callId ??
+    req.body.call_id ??
+    req.body.id ??
+    null;
+
   const duration = parseDurationSeconds(
     req.body.transferDuration ??
       req.body.transfer_duration ??
@@ -436,66 +556,22 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
       0
   );
 
-  const result = resolveTarget(rawCode, rawAttempts);
-  const postalCode = result.code || "";
   const status = inferCallStatus(duration);
 
-  console.log("=== AIRCALL ROUTING REQUEST ===");
+  console.log("=== AIRCALL CALL ENDED ===");
   console.log("Body reçu :", JSON.stringify(req.body, null, 2));
-  console.log("callerNumber :", callerNumber);
-  console.log("postalCode :", postalCode);
-  console.log("reason :", result.reason);
-  console.log("selected :", result.contact.name);
-  console.log("selectedEmail :", result.contact.email);
-  console.log("targetValue :", result.contact.targetValue);
-  console.log("status :", status);
+  console.log("callId :", callId);
   console.log("duration :", duration);
-  console.log("================================");
+  console.log("status :", status);
+  console.log("==========================");
 
-  const emailPromise = sendSectorEmail({
-    contact: result.contact,
-    departmentCode: postalCode,
-    callerNumber,
-    callerName,
+  res.json({ ok: true });
+
+  updateRoutingLogInSheetByCallId({
     callId,
-  });
-
-  const sheetPromise = appendRoutingLogToSheet({
-    callerNumber,
-    postalCode,
-    reason: result.reason,
-    selected: result.contact.name,
-    selectedEmail: result.contact.email,
-    targetValue: result.contact.targetValue,
     status,
     duration,
-  });
-
-  const results = await Promise.allSettled([emailPromise, sheetPromise]);
-
-  results.forEach((r, i) => {
-    if (r.status === "rejected") {
-      console.error(i === 0 ? "EMAIL ERROR:" : "SHEETS ERROR:", r.reason);
-    }
-  });
-
-  res.json({
-    routing: {
-      targetType: result.contact.targetType,
-      targetValue: result.contact.targetValue,
-    },
-    meta: {
-      callerNumber,
-      postalCode,
-      reason: result.reason,
-      selected: result.contact.name,
-      selectedEmail: result.contact.email,
-      targetValue: result.contact.targetValue,
-      status,
-      duration,
-      callId,
-    },
-  });
+  }).catch((e) => console.error("SHEETS UPDATE ERROR:", e));
 });
 
 app.get("/health", (req, res) => {
@@ -506,16 +582,23 @@ app.get("/test-sheet", async (req, res) => {
   try {
     await appendRoutingLogToSheet({
       callerNumber: "+33612345678",
-      postalCode: "41",
+      departmentCode: "41",
       reason: "TEST",
       selected: "Guillaume Nepveu",
       selectedEmail: "guillaume@rubiomonocoat.fr",
       targetValue: "+33607122212",
+      status: "en_cours",
+      duration: 0,
+      callId: "test-sheet-001",
+    });
+
+    await updateRoutingLogInSheetByCallId({
+      callId: "test-sheet-001",
       status: inferCallStatus(75),
       duration: 75,
     });
 
-    res.json({ ok: true, message: "Test Google Sheets envoyé" });
+    res.json({ ok: true, message: "Test Google Sheets append + update envoyé" });
   } catch (error) {
     console.error("TEST SHEETS ERROR:", error);
     res.status(500).json({ ok: false, error: error.message });
