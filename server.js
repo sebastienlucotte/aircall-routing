@@ -228,7 +228,7 @@ function checkAuth(req, res, next) {
 }
 
 function nowParis() {
-  return new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" });
+  return new Date().toLocaleString("sv-SE", { timeZone: "Europe/Paris" });
 }
 
 function normalizeCode(input) {
