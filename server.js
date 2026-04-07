@@ -41,9 +41,9 @@ const COMPTA_TARGET_NUMBER = "+33760078204";
 const SUIVI_COMMANDE_TARGET_NUMBER = "+33760078204";
 
 const COMMUNICATION_EMAIL = "antony@rubiomonocoat.fr";
-const COMMUNICATION_TARGET_NUMBER = "+33698281843";
+const COMMUNICATION_TARGET_NUMBER = "+33698281840";
 // Si tu veux strictement ce format, remplace par :
-// const COMMUNICATION_TARGET_NUMBER = "0033698281843";
+// const COMMUNICATION_TARGET_NUMBER = "0033698281840";
 
 // =========================
 // Contacts commerciaux
