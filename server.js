@@ -443,16 +443,50 @@ async function appendToSheet(sheetName, values) {
     return;
   }
 
-  const response = await sheets.spreadsheets.values.append({
+  const metadata = await sheets.spreadsheets.get({
     spreadsheetId: SHEET_ID,
-    range: `${sheetName}!A:O`,
-    valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [values] },
   });
 
-  console.log(`GOOGLE SHEETS APPEND OK [${sheetName}]:`, response.status);
-  console.log("UPDATED RANGE:", response.data?.updates?.updatedRange);
+  const sheet = metadata.data.sheets.find(
+    (s) => s.properties.title === sheetName
+  );
+
+  if (!sheet) {
+    throw new Error(`Sheet not found: ${sheetName}`);
+  }
+
+  const sheetId = sheet.properties.sheetId;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          insertDimension: {
+            range: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: 1,
+              endIndex: 2,
+            },
+            inheritFromBefore: false,
+          },
+        },
+      ],
+    },
+  });
+
+  const response = await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${sheetName}!A2:O2`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [values],
+    },
+  });
+
+  console.log(`GOOGLE SHEETS INSERT TOP OK [${sheetName}]:`, response.status);
+  console.log(`UPDATED RANGE: ${sheetName}!A2:O2`);
 }
 
 async function sendEmail({ to, subject, text }) {
@@ -650,7 +684,6 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   console.log(JSON.stringify(req.body, null, 2));
 
   const body = req.body || {};
-
   const rawCode = body.departmentCode ?? "";
   const rawAttempts = body.attempts ?? 0;
   const callerNumber = extractCallerNumber(body);
@@ -1004,7 +1037,6 @@ app.post("/aircall/acheter-rubio-technique-pro-routing", checkAuth, async (req, 
 
 // =========================
 // ROUTE 9 : Acheter_rubio_suivi_commande
-// Sonne sur 0757905604
 // =========================
 app.post("/aircall/acheter-rubio-suivi-commande-routing", checkAuth, async (req, res) => {
   console.log("=== ACHETER RUBIO SUIVI COMMANDE ROUTING ===");
