@@ -41,9 +41,7 @@ const COMPTA_TARGET_NUMBER = "+33760078204";
 const SUIVI_COMMANDE_TARGET_NUMBER = "+33760078204";
 
 const COMMUNICATION_EMAIL = "antony@rubiomonocoat.fr";
-const COMMUNICATION_TARGET_NUMBER = "+33698281840";
-// Si tu veux strictement ce format, remplace par :
-// const COMMUNICATION_TARGET_NUMBER = "0033698281840";
+const COMMUNICATION_TARGET_NUMBER = "00698281840";
 
 // =========================
 // Contacts commerciaux
@@ -316,6 +314,97 @@ function getSheetsClient() {
   return google.sheets({ version: "v4", auth });
 }
 
+function pickFirst(...values) {
+  for (const v of values) {
+    if (v !== undefined && v !== null && String(v).trim() !== "") {
+      return v;
+    }
+  }
+  return "";
+}
+
+function extractCallerNumber(body) {
+  return pickFirst(
+    body?.callerNumber,
+    body?.caller_number,
+    body?.from,
+    body?.number,
+    body?.customer?.number,
+    body?.customer_number,
+    body?.call?.from,
+    body?.call_from
+  );
+}
+
+function extractCallerName(body) {
+  return pickFirst(
+    body?.callerName,
+    body?.caller_name,
+    body?.name,
+    body?.from_name,
+    body?.customer?.name,
+    body?.customer_name,
+    body?.call?.from_name
+  );
+}
+
+function extractCallId(body) {
+  return pickFirst(
+    body?.callId,
+    body?.call_id,
+    body?.id,
+    body?.call?.id
+  );
+}
+
+function extractCallUuid(body) {
+  return pickFirst(
+    body?.callUuid,
+    body?.call_uuid,
+    body?.uuid,
+    body?.call?.uuid
+  );
+}
+
+function extractCallerType(body) {
+  return pickFirst(
+    body?.callerType,
+    body?.caller_type,
+    body?.type_appelant
+  );
+}
+
+function extractRequestObject(body) {
+  return pickFirst(
+    body?.requestObject,
+    body?.request_object,
+    body?.objet_demande,
+    body?.motif,
+    body?.reason_object
+  );
+}
+
+function extractAgentNote(body) {
+  const raw = pickFirst(
+    body?.agentNote,
+    body?.agent_note,
+    body?.note_agent_brute,
+    body?.summary,
+    body?.notes,
+    body?.note
+  );
+
+  if (typeof raw === "object" && raw !== null) {
+    try {
+      return JSON.stringify(raw);
+    } catch {
+      return "";
+    }
+  }
+
+  return raw || "";
+}
+
 async function appendToSheet(sheetName, values) {
   const sheets = getSheetsClient();
 
@@ -326,7 +415,7 @@ async function appendToSheet(sheetName, values) {
 
   const response = await sheets.spreadsheets.values.append({
     spreadsheetId: SHEET_ID,
-    range: `${sheetName}!A:Z`,
+    range: `${sheetName}!A:O`,
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [values] },
@@ -364,7 +453,7 @@ async function sendSectorEmail({
   callerName,
   callId,
 }) {
-  const subject = `Nouvel appel secteur ${departmentCode || "non défini"} - ${contact.name}`;
+  const subject = `[Commercial] Appel entrant - Secteur ${departmentCode || "ND"} - ${contact.name}`;
 
   const lines = [
     `Bonjour ${contact.name},`,
@@ -396,7 +485,10 @@ async function sendBarbaraServiceEmail({
   callerName,
   callId,
 }) {
-  const subject = `Nouvel appel ${serviceName}`;
+  const subject =
+    serviceName === "compta"
+      ? "[Compta] Appel entrant"
+      : "[Suivi commande] Appel entrant";
 
   const lines = [
     `Bonjour Barbara,`,
@@ -425,7 +517,7 @@ async function sendCommunicationServiceEmail({
   callerName,
   callId,
 }) {
-  const subject = `Nouvel appel service communication`;
+  const subject = "[Communication] Appel entrant";
 
   const lines = [
     `Bonjour Antony,`,
@@ -451,68 +543,109 @@ async function sendCommunicationServiceEmail({
 
 // =========================
 // Google Sheets logs
+// Colonnes :
+// A date et heure
+// B numero appelant
+// C code postal
+// D reason
+// E selected
+// F selectedemail
+// G target Value
+// H statut
+// I duree appel
+// J type_appelant
+// K objet_demande
+// L source_agent
+// M call_id
+// N call_uuid
+// O note_agent_brute
 // =========================
 async function appendRoutingLogToSheet({
+  sheetName = SHEET_NAME_LOGS,
   callerNumber,
   departmentCode,
   reason,
   selected,
   selectedEmail,
   targetValue,
-  callId,
+  status = "en_cours",
+  duration = 0,
+  callerType = "",
+  requestObject = "",
+  sourceAgent = "AI Voice Agent",
+  callId = "",
+  callUuid = "",
+  agentNote = "",
 }) {
-  await appendToSheet(SHEET_NAME_LOGS, [
-    nowParis(),          // A
-    callerNumber || "",  // B
-    departmentCode || "",// C
-    reason || "",        // D
-    selected || "",      // E
-    selectedEmail || "", // F
-    targetValue || "",   // G
-    "en_cours",          // H
-    0,                   // I
-    callId || "",        // J
+  await appendToSheet(sheetName, [
+    nowParis(),            // A
+    callerNumber || "",    // B
+    departmentCode || "",  // C
+    reason || "",          // D
+    selected || "",        // E
+    selectedEmail || "",   // F
+    targetValue || "",     // G
+    status || "",          // H
+    duration || 0,         // I
+    callerType || "",      // J
+    requestObject || "",   // K
+    sourceAgent || "",     // L
+    callId || "",          // M
+    callUuid || "",        // N
+    agentNote || "",       // O
   ]);
 }
 
 async function appendServiceLogToSheet({
   sheetName,
   serviceName,
+  selectedEmail,
   callerNumber,
   callerName,
   callId,
+  callUuid,
   targetNumber,
+  callerType,
+  requestObject,
+  agentNote,
 }) {
-  await appendToSheet(sheetName, [
-    nowParis(),            // A
-    serviceName || "",     // B
-    callerNumber || "",    // C
-    callerName || "",      // D
-    callId || "",          // E
-    targetNumber || "",    // F
-    "transfert_direct",    // G
-    "en_cours",            // H
-    0,                     // I
-  ]);
+  await appendRoutingLogToSheet({
+    sheetName,
+    callerNumber,
+    departmentCode: "",
+    reason: "DIRECT_SERVICE_ROUTING",
+    selected: serviceName || "",
+    selectedEmail: selectedEmail || "",
+    targetValue: targetNumber || "",
+    status: "en_cours",
+    duration: 0,
+    callerType: callerType || "",
+    requestObject: requestObject || callerName || "",
+    sourceAgent: "AI Voice Agent",
+    callId: callId || "",
+    callUuid: callUuid || "",
+    agentNote: agentNote || "",
+  });
 }
 
 // =========================
 // ROUTE 1 : COMMERCIAL
-// Appelée après saisie des 2 chiffres du département
 // =========================
 app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   console.log("=== SMART ROUTING COMMERCIAL ===");
   console.log(JSON.stringify(req.body, null, 2));
 
-  const rawCode = req.body.departmentCode ?? "";
-  const rawAttempts = req.body.attempts ?? 0;
-  const callerNumber = req.body.callerNumber ?? "";
-  const callerName =
-    req.body.callerName ??
-    req.body.name ??
-    req.body.caller_name ??
-    "";
-  const callId = req.body.callId ?? "";
+  const body = req.body || {};
+
+  const rawCode = body.departmentCode ?? "";
+  const rawAttempts = body.attempts ?? 0;
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
 
   const result = resolveTarget(rawCode, rawAttempts);
   const departmentCode = result.code || "";
@@ -533,31 +666,39 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   }).catch((e) => console.error("EMAIL ERROR:", e));
 
   appendRoutingLogToSheet({
+    sheetName: SHEET_NAME_LOGS,
     callerNumber,
     departmentCode,
     reason: result.reason,
     selected: result.contact.name,
     selectedEmail: result.contact.email,
     targetValue: result.contact.targetValue,
+    status: "en_cours",
+    duration: 0,
+    callerType,
+    requestObject,
+    sourceAgent: "AI Voice Agent",
     callId,
+    callUuid,
+    agentNote,
   }).catch((e) => console.error("SHEETS ERROR:", e));
 });
 
 // =========================
 // ROUTE 2 : COMPTA
-// Transfert direct, sans département
 // =========================
 app.post("/aircall/compta-routing", checkAuth, async (req, res) => {
   console.log("=== COMPTA ROUTING ===");
   console.log(JSON.stringify(req.body, null, 2));
 
-  const callerNumber = req.body.callerNumber ?? "";
-  const callerName =
-    req.body.callerName ??
-    req.body.name ??
-    req.body.caller_name ??
-    "";
-  const callId = req.body.callId ?? "";
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
 
   res.json({
     routing: {
@@ -577,28 +718,33 @@ app.post("/aircall/compta-routing", checkAuth, async (req, res) => {
   appendServiceLogToSheet({
     sheetName: SHEET_NAME_COMPTA,
     serviceName: "compta",
+    selectedEmail: BARBARA_EMAIL,
     callerNumber,
     callerName,
     callId,
+    callUuid,
     targetNumber: COMPTA_TARGET_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
   }).catch((e) => console.error("SHEETS ERROR:", e));
 });
 
 // =========================
 // ROUTE 3 : SUIVI COMMANDE
-// Transfert direct, sans département
 // =========================
 app.post("/aircall/suivi-commande-routing", checkAuth, async (req, res) => {
   console.log("=== SUIVI COMMANDE ROUTING ===");
   console.log(JSON.stringify(req.body, null, 2));
 
-  const callerNumber = req.body.callerNumber ?? "";
-  const callerName =
-    req.body.callerName ??
-    req.body.name ??
-    req.body.caller_name ??
-    "";
-  const callId = req.body.callId ?? "";
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
 
   res.json({
     routing: {
@@ -618,28 +764,33 @@ app.post("/aircall/suivi-commande-routing", checkAuth, async (req, res) => {
   appendServiceLogToSheet({
     sheetName: SHEET_NAME_SUIVI_COMMANDE,
     serviceName: "suivi_commande",
+    selectedEmail: BARBARA_EMAIL,
     callerNumber,
     callerName,
     callId,
+    callUuid,
     targetNumber: SUIVI_COMMANDE_TARGET_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
   }).catch((e) => console.error("SHEETS ERROR:", e));
 });
 
 // =========================
-// ROUTE 4 : SERVICE COMMUNICATION
-// Transfert direct, sans département
+// ROUTE 4 : COMMUNICATION
 // =========================
 app.post("/aircall/service-communication-routing", checkAuth, async (req, res) => {
   console.log("=== SERVICE COMMUNICATION ROUTING ===");
   console.log(JSON.stringify(req.body, null, 2));
 
-  const callerNumber = req.body.callerNumber ?? "";
-  const callerName =
-    req.body.callerName ??
-    req.body.name ??
-    req.body.caller_name ??
-    "";
-  const callId = req.body.callId ?? "";
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
 
   res.json({
     routing: {
@@ -657,10 +808,15 @@ app.post("/aircall/service-communication-routing", checkAuth, async (req, res) =
   appendServiceLogToSheet({
     sheetName: SHEET_NAME_SERVICE_COMMUNICATION,
     serviceName: "service_Communication",
+    selectedEmail: COMMUNICATION_EMAIL,
     callerNumber,
     callerName,
     callId,
+    callUuid,
     targetNumber: COMMUNICATION_TARGET_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
   }).catch((e) => console.error("SHEETS ERROR:", e));
 });
 
@@ -674,13 +830,21 @@ app.get("/health", (req, res) => {
 app.get("/test-sheet-commercial", async (req, res) => {
   try {
     await appendRoutingLogToSheet({
+      sheetName: SHEET_NAME_LOGS,
       callerNumber: "+33612345678",
       departmentCode: "41",
       reason: "TEST",
       selected: "Guillaume Nepveu",
       selectedEmail: "guillaume@rubiomonocoat.fr",
       targetValue: "+33607122212",
+      status: "en_cours",
+      duration: 0,
+      callerType: "professionnel",
+      requestObject: "test commercial",
+      sourceAgent: "AI Voice Agent",
       callId: "TEST-COMMERCIAL-001",
+      callUuid: "UUID-COMMERCIAL-001",
+      agentNote: "test",
     });
 
     res.json({ ok: true, message: "Test Google Sheets commercial envoyé" });
@@ -695,10 +859,15 @@ app.get("/test-sheet-compta", async (req, res) => {
     await appendServiceLogToSheet({
       sheetName: SHEET_NAME_COMPTA,
       serviceName: "compta",
+      selectedEmail: BARBARA_EMAIL,
       callerNumber: "+33612345678",
       callerName: "Test Compta",
       callId: "TEST-COMPTA-001",
+      callUuid: "UUID-COMPTA-001",
       targetNumber: COMPTA_TARGET_NUMBER,
+      callerType: "particulier",
+      requestObject: "test compta",
+      agentNote: "test",
     });
 
     res.json({ ok: true, message: "Test Google Sheets compta envoyé" });
@@ -713,10 +882,15 @@ app.get("/test-sheet-suivi", async (req, res) => {
     await appendServiceLogToSheet({
       sheetName: SHEET_NAME_SUIVI_COMMANDE,
       serviceName: "suivi_commande",
+      selectedEmail: BARBARA_EMAIL,
       callerNumber: "+33612345678",
       callerName: "Test Suivi",
       callId: "TEST-SUIVI-001",
+      callUuid: "UUID-SUIVI-001",
       targetNumber: SUIVI_COMMANDE_TARGET_NUMBER,
+      callerType: "particulier",
+      requestObject: "test suivi",
+      agentNote: "test",
     });
 
     res.json({ ok: true, message: "Test Google Sheets suivi envoyé" });
@@ -731,10 +905,15 @@ app.get("/test-sheet-communication", async (req, res) => {
     await appendServiceLogToSheet({
       sheetName: SHEET_NAME_SERVICE_COMMUNICATION,
       serviceName: "service_Communication",
+      selectedEmail: COMMUNICATION_EMAIL,
       callerNumber: "+33612345678",
       callerName: "Test Communication",
       callId: "TEST-COMMUNICATION-001",
+      callUuid: "UUID-COMMUNICATION-001",
       targetNumber: COMMUNICATION_TARGET_NUMBER,
+      callerType: "particulier",
+      requestObject: "test communication",
+      agentNote: "test",
     });
 
     res.json({ ok: true, message: "Test Google Sheets communication envoyé" });
