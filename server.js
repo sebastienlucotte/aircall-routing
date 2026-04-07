@@ -51,7 +51,7 @@ const COMMUNICATION_EMAIL = "antony@rubiomonocoat.fr";
 const COMMUNICATION_TARGET_NUMBER = "00698281840";
 
 const RUBIO_MONOCOAT_INTERNAL_NUMBER = "+33757941786";
-const ACHETER_RUBIO_PARIS_NUMBER = "+33757905604;
+const ACHETER_RUBIO_PARIS_NUMBER = "+33757905604";
 
 // =========================
 // Contacts commerciaux
