@@ -573,22 +573,6 @@ async function sendCommunicationServiceEmail({
 
 // =========================
 // Google Sheets commerciaux
-// Colonnes :
-// A date et heure
-// B numero appelant
-// C code postal
-// D reason
-// E selected
-// F selectedemail
-// G target Value
-// H statut
-// I duree appel
-// J type_appelant
-// K objet_demande
-// L source_agent
-// M call_id
-// N call_uuid
-// O note_agent_brute
 // =========================
 async function appendRoutingLogToSheet({
   sheetName = SHEET_NAME_COMMERCIAUX,
@@ -608,21 +592,21 @@ async function appendRoutingLogToSheet({
   agentNote = "",
 }) {
   await appendToSheet(sheetName, [
-    nowParis(),                              // A
-    callerNumber || "NUMERO_NON_REMONTE",   // B
-    departmentCode || "",                   // C
-    reason || "",                           // D
-    selected || "",                         // E
-    selectedEmail || "",                    // F
-    targetValue || "",                      // G
-    status || "",                           // H
-    duration || 0,                          // I
-    callerType || "",                       // J
-    requestObject || "",                    // K
-    sourceAgent || "",                      // L
-    callId || "",                           // M
-    callUuid || "",                         // N
-    agentNote || "",                        // O
+    nowParis(),
+    callerNumber || "NUMERO_NON_REMONTE",
+    departmentCode || "",
+    reason || "",
+    selected || "",
+    selectedEmail || "",
+    targetValue || "",
+    status || "",
+    duration || 0,
+    callerType || "",
+    requestObject || "",
+    sourceAgent || "",
+    callId || "",
+    callUuid || "",
+    agentNote || "",
   ]);
 }
 
@@ -860,7 +844,6 @@ app.post("/aircall/service-communication-routing", checkAuth, async (req, res) =
 
 // =========================
 // ROUTE 5 : Service_technique_particulier
-// Pas d'email
 // =========================
 app.post("/aircall/service-technique-particulier-routing", checkAuth, async (req, res) => {
   console.log("=== SERVICE TECHNIQUE PARTICULIER ROUTING ===");
@@ -901,7 +884,6 @@ app.post("/aircall/service-technique-particulier-routing", checkAuth, async (req
 
 // =========================
 // ROUTE 6 : Service_commande_particulier
-// Pas d'email
 // =========================
 app.post("/aircall/service-commande-particulier-routing", checkAuth, async (req, res) => {
   console.log("=== SERVICE COMMANDE PARTICULIER ROUTING ===");
@@ -942,7 +924,6 @@ app.post("/aircall/service-commande-particulier-routing", checkAuth, async (req,
 
 // =========================
 // ROUTE 7 : Acheter_rubio_technique_part
-// Pas d'email
 // =========================
 app.post("/aircall/acheter-rubio-technique-part-routing", checkAuth, async (req, res) => {
   console.log("=== ACHETER RUBIO TECHNIQUE PART ROUTING ===");
@@ -983,7 +964,6 @@ app.post("/aircall/acheter-rubio-technique-part-routing", checkAuth, async (req,
 
 // =========================
 // ROUTE 8 : Acheter_rubio_technique_pro
-// Pas d'email
 // =========================
 app.post("/aircall/acheter-rubio-technique-pro-routing", checkAuth, async (req, res) => {
   console.log("=== ACHETER RUBIO TECHNIQUE PRO ROUTING ===");
@@ -1024,7 +1004,7 @@ app.post("/aircall/acheter-rubio-technique-pro-routing", checkAuth, async (req, 
 
 // =========================
 // ROUTE 9 : Acheter_rubio_suivi_commande
-// Pas d'email
+// Sonne sur 0757905604
 // =========================
 app.post("/aircall/acheter-rubio-suivi-commande-routing", checkAuth, async (req, res) => {
   console.log("=== ACHETER RUBIO SUIVI COMMANDE ROUTING ===");
