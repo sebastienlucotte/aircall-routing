@@ -33,6 +33,13 @@ const SHEET_NAME_COMPTA = "compta";
 const SHEET_NAME_SUIVI_COMMANDE = "suivi_commande";
 const SHEET_NAME_SERVICE_COMMUNICATION = "service_Communication";
 
+// Nouvelles feuilles sans email
+const SHEET_NAME_SERVICE_TECHNIQUE_PARTICULIER = "Service_technique_particulier";
+const SHEET_NAME_SERVICE_COMMANDE_PARTICULIER = "Service_commande_particulier";
+const SHEET_NAME_ACHETER_RUBIO_TECHNIQUE_PART = "Acheter_rubio_technique_part";
+const SHEET_NAME_ACHETER_RUBIO_TECHNIQUE_PRO = "Acheter_rubio_technique_pro";
+const SHEET_NAME_ACHETER_RUBIO_SUIVI_COMMANDE = "Acheter_rubio_suivi_commande";
+
 // =========================
 // Cibles fixes
 // =========================
@@ -42,6 +49,10 @@ const SUIVI_COMMANDE_TARGET_NUMBER = "+33760078204";
 
 const COMMUNICATION_EMAIL = "antony@rubiomonocoat.fr";
 const COMMUNICATION_TARGET_NUMBER = "00698281840";
+
+// Nouvelles cibles sans email
+const RUBIO_MONOCOAT_INTERNAL_NUMBER = "+33757941786";
+const ACHETER_RUBIO_PARIS_NUMBER = "+33189724090";
 
 // =========================
 // Contacts commerciaux
@@ -543,22 +554,6 @@ async function sendCommunicationServiceEmail({
 
 // =========================
 // Google Sheets logs
-// Colonnes :
-// A date et heure
-// B numero appelant
-// C code postal
-// D reason
-// E selected
-// F selectedemail
-// G target Value
-// H statut
-// I duree appel
-// J type_appelant
-// K objet_demande
-// L source_agent
-// M call_id
-// N call_uuid
-// O note_agent_brute
 // =========================
 async function appendRoutingLogToSheet({
   sheetName = SHEET_NAME_LOGS,
@@ -814,6 +809,201 @@ app.post("/aircall/service-communication-routing", checkAuth, async (req, res) =
     callId,
     callUuid,
     targetNumber: COMMUNICATION_TARGET_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
+  }).catch((e) => console.error("SHEETS ERROR:", e));
+});
+
+// =========================
+// ROUTE 5 : Service_technique_particulier
+// Pas d'email
+// =========================
+app.post("/aircall/service-technique-particulier-routing", checkAuth, async (req, res) => {
+  console.log("=== SERVICE TECHNIQUE PARTICULIER ROUTING ===");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
+
+  res.json({
+    routing: {
+      targetType: "external",
+      targetValue: RUBIO_MONOCOAT_INTERNAL_NUMBER,
+    },
+  });
+
+  appendServiceLogToSheet({
+    sheetName: SHEET_NAME_SERVICE_TECHNIQUE_PARTICULIER,
+    serviceName: "Service_technique_particulier",
+    selectedEmail: "",
+    callerNumber,
+    callerName,
+    callId,
+    callUuid,
+    targetNumber: RUBIO_MONOCOAT_INTERNAL_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
+  }).catch((e) => console.error("SHEETS ERROR:", e));
+});
+
+// =========================
+// ROUTE 6 : Service_commande_particulier
+// Pas d'email
+// =========================
+app.post("/aircall/service-commande-particulier-routing", checkAuth, async (req, res) => {
+  console.log("=== SERVICE COMMANDE PARTICULIER ROUTING ===");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
+
+  res.json({
+    routing: {
+      targetType: "external",
+      targetValue: RUBIO_MONOCOAT_INTERNAL_NUMBER,
+    },
+  });
+
+  appendServiceLogToSheet({
+    sheetName: SHEET_NAME_SERVICE_COMMANDE_PARTICULIER,
+    serviceName: "Service_commande_particulier",
+    selectedEmail: "",
+    callerNumber,
+    callerName,
+    callId,
+    callUuid,
+    targetNumber: RUBIO_MONOCOAT_INTERNAL_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
+  }).catch((e) => console.error("SHEETS ERROR:", e));
+});
+
+// =========================
+// ROUTE 7 : Acheter_rubio_technique_part
+// Pas d'email
+// =========================
+app.post("/aircall/acheter-rubio-technique-part-routing", checkAuth, async (req, res) => {
+  console.log("=== ACHETER RUBIO TECHNIQUE PART ROUTING ===");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
+
+  res.json({
+    routing: {
+      targetType: "external",
+      targetValue: ACHETER_RUBIO_PARIS_NUMBER,
+    },
+  });
+
+  appendServiceLogToSheet({
+    sheetName: SHEET_NAME_ACHETER_RUBIO_TECHNIQUE_PART,
+    serviceName: "Acheter_rubio_technique_part",
+    selectedEmail: "",
+    callerNumber,
+    callerName,
+    callId,
+    callUuid,
+    targetNumber: ACHETER_RUBIO_PARIS_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
+  }).catch((e) => console.error("SHEETS ERROR:", e));
+});
+
+// =========================
+// ROUTE 8 : Acheter_rubio_technique_pro
+// Pas d'email
+// =========================
+app.post("/aircall/acheter-rubio-technique-pro-routing", checkAuth, async (req, res) => {
+  console.log("=== ACHETER RUBIO TECHNIQUE PRO ROUTING ===");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
+
+  res.json({
+    routing: {
+      targetType: "external",
+      targetValue: ACHETER_RUBIO_PARIS_NUMBER,
+    },
+  });
+
+  appendServiceLogToSheet({
+    sheetName: SHEET_NAME_ACHETER_RUBIO_TECHNIQUE_PRO,
+    serviceName: "Acheter_rubio_technique_pro",
+    selectedEmail: "",
+    callerNumber,
+    callerName,
+    callId,
+    callUuid,
+    targetNumber: ACHETER_RUBIO_PARIS_NUMBER,
+    callerType,
+    requestObject,
+    agentNote,
+  }).catch((e) => console.error("SHEETS ERROR:", e));
+});
+
+// =========================
+// ROUTE 9 : Acheter_rubio_suivi_commande
+// Pas d'email
+// =========================
+app.post("/aircall/acheter-rubio-suivi-commande-routing", checkAuth, async (req, res) => {
+  console.log("=== ACHETER RUBIO SUIVI COMMANDE ROUTING ===");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  const body = req.body || {};
+  const callerNumber = extractCallerNumber(body);
+  const callerName = extractCallerName(body);
+  const callId = extractCallId(body);
+  const callUuid = extractCallUuid(body);
+  const callerType = extractCallerType(body);
+  const requestObject = extractRequestObject(body);
+  const agentNote = extractAgentNote(body);
+
+  res.json({
+    routing: {
+      targetType: "external",
+      targetValue: ACHETER_RUBIO_PARIS_NUMBER,
+    },
+  });
+
+  appendServiceLogToSheet({
+    sheetName: SHEET_NAME_ACHETER_RUBIO_SUIVI_COMMANDE,
+    serviceName: "Acheter_rubio_suivi_commande",
+    selectedEmail: "",
+    callerNumber,
+    callerName,
+    callId,
+    callUuid,
+    targetNumber: ACHETER_RUBIO_PARIS_NUMBER,
     callerType,
     requestObject,
     agentNote,
