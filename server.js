@@ -29,7 +29,7 @@ const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY =
   process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
 // Feuilles
-const SHEET_NAME_LOGS = "Commerciaux";
+const SHEET_NAME_COMMERCIAUX = "Commerciaux";
 const SHEET_NAME_COMPTA = "compta";
 const SHEET_NAME_SUIVI_COMMANDE = "suivi_commande";
 const SHEET_NAME_SERVICE_COMMUNICATION = "service_Communication";
@@ -591,7 +591,7 @@ async function sendCommunicationServiceEmail({
 // O note_agent_brute
 // =========================
 async function appendRoutingLogToSheet({
-  sheetName = SHEET_NAME_LOGS,
+  sheetName = SHEET_NAME_COMMERCIAUX,
   callerNumber,
   departmentCode,
   reason,
@@ -698,7 +698,7 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   }).catch((e) => console.error("EMAIL ERROR:", e));
 
   appendRoutingLogToSheet({
-    sheetName: SHEET_NAME_LOGS,
+    sheetName: SHEET_NAME_COMMERCIAUX,
     callerNumber,
     departmentCode,
     reason: result.reason,
