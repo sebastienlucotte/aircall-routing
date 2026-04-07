@@ -28,12 +28,12 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY =
   process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
+// Feuilles
 const SHEET_NAME_LOGS = "Logs";
 const SHEET_NAME_COMPTA = "compta";
 const SHEET_NAME_SUIVI_COMMANDE = "suivi_commande";
 const SHEET_NAME_SERVICE_COMMUNICATION = "service_Communication";
 
-// Nouvelles feuilles sans email
 const SHEET_NAME_SERVICE_TECHNIQUE_PARTICULIER = "Service_technique_particulier";
 const SHEET_NAME_SERVICE_COMMANDE_PARTICULIER = "Service_commande_particulier";
 const SHEET_NAME_ACHETER_RUBIO_TECHNIQUE_PART = "Acheter_rubio_technique_part";
@@ -50,7 +50,6 @@ const SUIVI_COMMANDE_TARGET_NUMBER = "+33760078204";
 const COMMUNICATION_EMAIL = "antony@rubiomonocoat.fr";
 const COMMUNICATION_TARGET_NUMBER = "00698281840";
 
-// Nouvelles cibles sans email
 const RUBIO_MONOCOAT_INTERNAL_NUMBER = "+33757941786";
 const ACHETER_RUBIO_PARIS_NUMBER = "+33189724090";
 
@@ -338,12 +337,21 @@ function extractCallerNumber(body) {
   return pickFirst(
     body?.callerNumber,
     body?.caller_number,
+    body?.phoneNumber,
+    body?.phone_number,
     body?.from,
+    body?.fromNumber,
+    body?.from_number,
     body?.number,
     body?.customer?.number,
+    body?.customer?.phone,
     body?.customer_number,
     body?.call?.from,
-    body?.call_from
+    body?.call?.from_number,
+    body?.call_from,
+    body?.contact?.phone,
+    body?.contact?.number,
+    body?.raw_digits
   );
 }
 
@@ -364,6 +372,10 @@ function extractCallId(body) {
     body?.callId,
     body?.call_id,
     body?.id,
+    body?.conversationId,
+    body?.conversation_id,
+    body?.communicationId,
+    body?.communication_id,
     body?.call?.id
   );
 }
@@ -414,6 +426,13 @@ function extractAgentNote(body) {
   }
 
   return raw || "";
+}
+
+function logExtractedValues({ callerNumber, callerName, callId, callUuid }) {
+  console.log("callerNumber extracted =", callerNumber || "VIDE");
+  console.log("callerName extracted =", callerName || "VIDE");
+  console.log("callId extracted =", callId || "VIDE");
+  console.log("callUuid extracted =", callUuid || "VIDE");
 }
 
 async function appendToSheet(sheetName, values) {
@@ -554,6 +573,22 @@ async function sendCommunicationServiceEmail({
 
 // =========================
 // Google Sheets logs
+// Colonnes :
+// A date et heure
+// B numero appelant
+// C code postal
+// D reason
+// E selected
+// F selectedemail
+// G target Value
+// H statut
+// I duree appel
+// J type_appelant
+// K objet_demande
+// L source_agent
+// M call_id
+// N call_uuid
+// O note_agent_brute
 // =========================
 async function appendRoutingLogToSheet({
   sheetName = SHEET_NAME_LOGS,
@@ -573,21 +608,21 @@ async function appendRoutingLogToSheet({
   agentNote = "",
 }) {
   await appendToSheet(sheetName, [
-    nowParis(),            // A
-    callerNumber || "",    // B
-    departmentCode || "",  // C
-    reason || "",          // D
-    selected || "",        // E
-    selectedEmail || "",   // F
-    targetValue || "",     // G
-    status || "",          // H
-    duration || 0,         // I
-    callerType || "",      // J
-    requestObject || "",   // K
-    sourceAgent || "",     // L
-    callId || "",          // M
-    callUuid || "",        // N
-    agentNote || "",       // O
+    nowParis(),                              // A
+    callerNumber || "NUMERO_NON_REMONTE",   // B
+    departmentCode || "",                   // C
+    reason || "",                           // D
+    selected || "",                         // E
+    selectedEmail || "",                    // F
+    targetValue || "",                      // G
+    status || "",                           // H
+    duration || 0,                          // I
+    callerType || "",                       // J
+    requestObject || "",                    // K
+    sourceAgent || "",                      // L
+    callId || "",                           // M
+    callUuid || "",                         // N
+    agentNote || "",                        // O
   ]);
 }
 
@@ -642,6 +677,8 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
 
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
+
   const result = resolveTarget(rawCode, rawAttempts);
   const departmentCode = result.code || "";
 
@@ -695,6 +732,8 @@ app.post("/aircall/compta-routing", checkAuth, async (req, res) => {
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
 
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
+
   res.json({
     routing: {
       targetType: "external",
@@ -740,6 +779,8 @@ app.post("/aircall/suivi-commande-routing", checkAuth, async (req, res) => {
   const callerType = extractCallerType(body);
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
+
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
 
   res.json({
     routing: {
@@ -787,6 +828,8 @@ app.post("/aircall/service-communication-routing", checkAuth, async (req, res) =
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
 
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
+
   res.json({
     routing: {
       targetType: "external",
@@ -832,6 +875,8 @@ app.post("/aircall/service-technique-particulier-routing", checkAuth, async (req
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
 
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
+
   res.json({
     routing: {
       targetType: "external",
@@ -870,6 +915,8 @@ app.post("/aircall/service-commande-particulier-routing", checkAuth, async (req,
   const callerType = extractCallerType(body);
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
+
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
 
   res.json({
     routing: {
@@ -910,6 +957,8 @@ app.post("/aircall/acheter-rubio-technique-part-routing", checkAuth, async (req,
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
 
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
+
   res.json({
     routing: {
       targetType: "external",
@@ -949,6 +998,8 @@ app.post("/aircall/acheter-rubio-technique-pro-routing", checkAuth, async (req, 
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
 
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
+
   res.json({
     routing: {
       targetType: "external",
@@ -987,6 +1038,8 @@ app.post("/aircall/acheter-rubio-suivi-commande-routing", checkAuth, async (req,
   const callerType = extractCallerType(body);
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
+
+  logExtractedValues({ callerNumber, callerName, callId, callUuid });
 
   res.json({
     routing: {
