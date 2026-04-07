@@ -572,7 +572,7 @@ async function sendCommunicationServiceEmail({
 }
 
 // =========================
-// Google Sheets logs
+// Google Sheets commerciaux
 // Colonnes :
 // A date et heure
 // B numero appelant
@@ -1073,7 +1073,7 @@ app.get("/health", (req, res) => {
 app.get("/test-sheet-commercial", async (req, res) => {
   try {
     await appendRoutingLogToSheet({
-      sheetName: SHEET_NAME_LOGS,
+      sheetName: SHEET_NAME_COMMERCIAUX,
       callerNumber: "+33612345678",
       departmentCode: "41",
       reason: "TEST",
