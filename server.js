@@ -399,14 +399,41 @@ function extractCallerType(body) {
   );
 }
 
+function normalizeRequestObject(value) {
+  const v = String(value || "").trim().toLowerCase();
+
+  if (!v) return "";
+
+  if (
+    v === "conseil_technique_pro" ||
+    v === "branche_conseil_technique_pro" ||
+    v === "conseil technique pro"
+  ) {
+    return "Branche conseil technique pro";
+  }
+
+  if (
+    v === "distributeur_commerciaux" ||
+    v === "branche_distributeur_commerciaux" ||
+    v === "distributeur commerciaux" ||
+    v === "commerciaux"
+  ) {
+    return "Branche distributeur-commerciaux";
+  }
+
+  return String(value).trim();
+}
+
 function extractRequestObject(body) {
-  return pickFirst(
+  const raw = pickFirst(
     body?.requestObject,
     body?.request_object,
     body?.objet_demande,
     body?.motif,
     body?.reason_object
   );
+
+  return normalizeRequestObject(raw);
 }
 
 function extractAgentNote(body) {
@@ -704,6 +731,7 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   const agentNote = extractAgentNote(body);
 
   logExtractedValues({ callerNumber, callerName, callId, callUuid });
+  console.log("requestObject extracted =", requestObject || "VIDE");
 
   const result = resolveTarget(rawCode, rawAttempts);
   const departmentCode = result.code || "";
@@ -1104,7 +1132,7 @@ app.get("/test-sheet-commercial", async (req, res) => {
       status: "en_cours",
       duration: 0,
       callerType: "professionnel",
-      requestObject: "test commercial",
+      requestObject: "Branche distributeur-commerciaux",
       sourceAgent: "AI Voice Agent",
       callId: "TEST-COMMERCIAL-001",
       callUuid: "UUID-COMMERCIAL-001",
