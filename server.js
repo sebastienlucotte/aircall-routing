@@ -28,9 +28,11 @@ const GOOGLE_SERVICE_ACCOUNT_EMAIL = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 const GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY =
   process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
-// Feuilles
+// =========================
+// Feuilles Google Sheets
+// =========================
 const SHEET_NAME_COMMERCIAUX = "Commerciaux";
-const SHEET_NAME_COMPTA = "compta";
+const SHEET_NAME_COMPTA = "Compta";
 const SHEET_NAME_SUIVI_COMMANDE = "suivi_commande";
 const SHEET_NAME_SERVICE_COMMUNICATION = "service_Communication";
 
@@ -48,7 +50,7 @@ const COMPTA_TARGET_NUMBER = "+33760078204";
 const SUIVI_COMMANDE_TARGET_NUMBER = "+33760078204";
 
 const COMMUNICATION_EMAIL = "antony@rubiomonocoat.fr";
-const COMMUNICATION_TARGET_NUMBER = "00698281840";
+const COMMUNICATION_TARGET_NUMBER = "+33698281840";
 
 const RUBIO_MONOCOAT_INTERNAL_NUMBER = "+33757941786";
 const ACHETER_RUBIO_PARIS_NUMBER = "+33757905604";
@@ -447,14 +449,21 @@ async function appendToSheet(sheetName, values) {
     spreadsheetId: SHEET_ID,
   });
 
+  const availableSheets = metadata.data.sheets.map((s) => s.properties.title);
+  console.log("AVAILABLE SHEETS:", availableSheets);
+  console.log("REQUESTED SHEET:", sheetName);
+
+  const normalizedRequested = String(sheetName).trim();
+
   const sheet = metadata.data.sheets.find(
-    (s) => s.properties.title === sheetName
+    (s) => String(s.properties.title).trim() === normalizedRequested
   );
 
   if (!sheet) {
     throw new Error(`Sheet not found: ${sheetName}`);
   }
 
+  const realSheetTitle = sheet.properties.title;
   const sheetId = sheet.properties.sheetId;
 
   await sheets.spreadsheets.batchUpdate({
@@ -478,15 +487,15 @@ async function appendToSheet(sheetName, values) {
 
   const response = await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
-    range: `${sheetName}!A2:O2`,
+    range: `'${realSheetTitle}'!A2:O2`,
     valueInputOption: "RAW",
     requestBody: {
       values: [values],
     },
   });
 
-  console.log(`GOOGLE SHEETS INSERT TOP OK [${sheetName}]:`, response.status);
-  console.log(`UPDATED RANGE: ${sheetName}!A2:O2`);
+  console.log(`GOOGLE SHEETS INSERT TOP OK [${realSheetTitle}]:`, response.status);
+  console.log(`UPDATED RANGE: '${realSheetTitle}'!A2:O2`);
 }
 
 async function sendEmail({ to, subject, text }) {
