@@ -457,6 +457,18 @@ function extractAgentNote(body) {
   return raw || "";
 }
 
+function extractDuration(body) {
+  return pickFirst(
+    body?.duration,
+    body?.callDuration,
+    body?.call_duration,
+    body?.durationSeconds,
+    body?.duration_seconds,
+    body?.call?.duration,
+    body?.call?.duration_seconds
+  );
+}
+
 function logExtractedValues({ callerNumber, callerName, callId, callUuid }) {
   console.log("callerNumber extracted =", callerNumber || "VIDE");
   console.log("callerName extracted =", callerName || "VIDE");
@@ -729,9 +741,12 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
   const callerType = extractCallerType(body);
   const requestObject = extractRequestObject(body);
   const agentNote = extractAgentNote(body);
+  const duration = extractDuration(body);
 
   logExtractedValues({ callerNumber, callerName, callId, callUuid });
   console.log("requestObject extracted =", requestObject || "VIDE");
+  console.log("duration extracted =", duration || "VIDE");
+  console.log("FULL BODY =", JSON.stringify(body, null, 2));
 
   const result = resolveTarget(rawCode, rawAttempts);
   const departmentCode = result.code || "";
@@ -760,7 +775,7 @@ app.post("/aircall/smart-routing", checkAuth, async (req, res) => {
     selectedEmail: result.contact.email,
     targetValue: result.contact.targetValue,
     status: "en_cours",
-    duration: 0,
+    duration: duration || 0,
     callerType,
     requestObject,
     sourceAgent: "AI Voice Agent",
