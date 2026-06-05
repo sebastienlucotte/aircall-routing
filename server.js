@@ -46,8 +46,8 @@ const SHEET_NAME_ACHETER_RUBIO_SUIVI_COMMANDE = "Acheter_rubio_suivi_commande";
 // Cibles fixes
 // =========================
 const BARBARA_EMAIL = "barbara@rubiomonocoat.fr";
-const COMPTA_TARGET_NUMBER = "+33760078204";
-const SUIVI_COMMANDE_TARGET_NUMBER = "+33760078204";
+const COMPTA_TARGET_NUMBER = "+33189750040";
+const SUIVI_COMMANDE_TARGET_NUMBER = "+33189750040";
 
 const COMMUNICATION_EMAIL = "antony@rubiomonocoat.fr";
 const COMMUNICATION_TARGET_NUMBER = "+33698281840";
